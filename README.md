@@ -97,6 +97,16 @@ ls /Applications/Hammerspoon.app && echo "✓ Hammerspoon" || echo "✗ Hammersp
 ls ~/Library/Application\ Support/whisper.cpp/*.bin && echo "✓ Models" || echo "✗ Models"
 ```
 
+## Feedback & Ideas
+
+Have ideas for new features? [Open an issue](https://github.com/sparrowfm/voice-ptt/issues) or start a discussion.
+
+Some things we're considering:
+- Audio feedback (beep) instead of visual alerts
+- Copy-only mode (don't auto-paste)
+- Transcription history log
+- Multi-language support
+
 ## Credits
 
 - [whisper.cpp](https://github.com/ggerganov/whisper.cpp) - High-performance Whisper inference by Georgi Gerganov
