@@ -2,6 +2,17 @@
 
 One-command push-to-talk voice transcription for macOS. 100% local, no cloud, powered by Whisper AI on Apple Silicon.
 
+## Why Local?
+
+Your voice is personal. Every word you dictate - emails to colleagues, notes about clients, personal journal entries, medical information, legal documents - deserves privacy.
+
+Cloud-based transcription means your audio is uploaded to remote servers, processed by third parties, and potentially stored indefinitely. With voice-ptt, **nothing ever leaves your Mac**. Your voice data stays on your machine, processed entirely by your own hardware.
+
+- **No subscriptions** - One-time install, works forever
+- **No internet required** - Works offline, on airplanes, anywhere
+- **No data collection** - Zero telemetry, zero tracking
+- **No usage limits** - Transcribe as much as you want
+
 ## Install
 
 ```bash
@@ -109,10 +120,15 @@ Some things we're considering:
 
 ## Credits
 
-- [whisper.cpp](https://github.com/ggerganov/whisper.cpp) - High-performance Whisper inference by Georgi Gerganov
-- [Hammerspoon](https://www.hammerspoon.org/) - macOS automation tool
-- [SoX](http://sox.sourceforge.net/) - Sound eXchange audio utility
-- [OpenAI Whisper](https://github.com/openai/whisper) - Original speech recognition model
+This project stands on the shoulders of giants:
+
+- **[whisper.cpp](https://github.com/ggerganov/whisper.cpp)** by Georgi Gerganov - An incredible feat of engineering that makes OpenAI's Whisper model run blazingly fast on Apple Silicon using Metal GPU acceleration. Without this project, local voice transcription at this speed wouldn't be possible.
+
+- **[Hammerspoon](https://www.hammerspoon.org/)** - A powerful macOS automation tool that's been a cornerstone of the Mac power-user community for years. Its Lua scripting and hotkey system made the push-to-talk interaction seamless.
+
+- **[SoX](http://sox.sourceforge.net/)** - The "Swiss Army knife of audio" has been faithfully processing audio on Unix systems since 1991. Simple, reliable, does exactly what it needs to do.
+
+- **[OpenAI Whisper](https://github.com/openai/whisper)** - The original speech recognition model that made all of this possible. OpenAI's decision to open-source Whisper enabled the entire ecosystem of local, private transcription tools.
 
 ## License
 
