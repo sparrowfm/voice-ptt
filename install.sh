@@ -1,9 +1,7 @@
 #!/bin/bash
 # install-voice.sh - One-command push-to-talk voice transcription setup for macOS
-# Usage: curl -fsSL URL | bash
+# Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install-voice.sh
-
-# Don't use set -e - handle errors explicitly to avoid silent failures
 
 echo "═══════════════════════════════════════════════════════════════"
 echo "  Push-to-Talk Voice Transcription Installer"
@@ -45,6 +43,44 @@ fi
 
 echo "✓ macOS on Apple Silicon detected"
 echo "✓ Homebrew found at $BREW_PATH"
+echo
+
+# Hotkey selection
+echo "─────────────────────────────────────────────────────────────────"
+echo "Choose your push-to-talk hotkey:"
+echo ""
+echo "  1) F12        (default - easy to reach)"
+echo "  2) F11"
+echo "  3) F10"
+echo "  4) F9"
+echo "  5) Ctrl+Shift+Space"
+echo "  6) Cmd+Shift+M"
+echo ""
+
+HOTKEY_MODS="{}"
+HOTKEY_KEY="F12"
+
+# Check if running interactively
+if [[ -t 0 ]]; then
+    read -p "Enter choice [1-6, default=1]: " -n 1 -r hotkey_choice
+    echo ""
+    case "$hotkey_choice" in
+        2) HOTKEY_KEY="F11" ;;
+        3) HOTKEY_KEY="F10" ;;
+        4) HOTKEY_KEY="F9" ;;
+        5) HOTKEY_MODS='{"ctrl", "shift"}'; HOTKEY_KEY="space" ;;
+        6) HOTKEY_MODS='{"cmd", "shift"}'; HOTKEY_KEY="m" ;;
+        *) HOTKEY_KEY="F12" ;;
+    esac
+else
+    echo "Running non-interactively, using default: F12"
+fi
+
+if [[ "$HOTKEY_MODS" == "{}" ]]; then
+    echo "✓ Hotkey selected: $HOTKEY_KEY"
+else
+    echo "✓ Hotkey selected: $HOTKEY_MODS + $HOTKEY_KEY"
+fi
 echo
 
 # Install dependencies
@@ -140,6 +176,7 @@ write_config=false
 if [[ -f "$CONFIG_FILE" ]]; then
     if grep -q "Push-to-Talk Whisper" "$CONFIG_FILE" 2>/dev/null; then
         echo "✓ Push-to-talk config already present in init.lua"
+        echo "  (To change hotkey, run: voice-ptt-hotkey)"
     else
         BACKUP_FILE="$HOME/.hammerspoon/init.lua.backup.$(date +%Y%m%d%H%M%S)"
         echo "Backing up existing init.lua to $(basename "$BACKUP_FILE")"
@@ -154,9 +191,9 @@ fi
 
 # Write config if needed (new install or backup was made)
 if [[ "$write_config" == "true" ]]; then
-cat > "$CONFIG_FILE" << 'LUAEOF'
+cat > "$CONFIG_FILE" << LUAEOF
 -- Push-to-Talk Whisper Transcription
--- Hold F12 to record, release to transcribe and paste
+-- Hold hotkey to record, release to transcribe and paste
 -- 100% local - no cloud, no data leaves your Mac
 
 local whisper = "/opt/homebrew/bin/whisper-cli"
@@ -171,9 +208,9 @@ local outputFile = outputBase .. ".txt"
 
 local recordingTask = nil
 
--- CHANGE HOTKEY HERE if needed
-local mods = {}
-local key = "F12"
+-- HOTKEY CONFIG (change with voice-ptt-hotkey command)
+local mods = $HOTKEY_MODS
+local key = "$HOTKEY_KEY"
 
 hs.hotkey.bind(mods, key,
   function()
@@ -229,10 +266,119 @@ hs.hotkey.bind(mods, key,
   end
 )
 
-hs.alert.show("Voice transcription ready (F12)")
+hs.alert.show("Voice transcription ready ($HOTKEY_KEY)")
 LUAEOF
     echo "✓ Hammerspoon config created"
 fi
+
+# Create hotkey change script
+echo "Creating hotkey configuration command..."
+cat > /usr/local/bin/voice-ptt-hotkey << 'HOTKEYEOF'
+#!/bin/bash
+# voice-ptt-hotkey - Change the push-to-talk hotkey
+
+CONFIG_FILE="$HOME/.hammerspoon/init.lua"
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "❌ Hammerspoon config not found. Run the installer first."
+    exit 1
+fi
+
+echo "Current hotkey configuration:"
+grep -E "^local (mods|key) = " "$CONFIG_FILE" | head -2
+echo ""
+echo "Choose new hotkey:"
+echo ""
+echo "  1) F12"
+echo "  2) F11"
+echo "  3) F10"
+echo "  4) F9"
+echo "  5) Ctrl+Shift+Space"
+echo "  6) Cmd+Shift+M"
+echo ""
+read -p "Enter choice [1-6]: " -n 1 -r choice
+echo ""
+
+case "$choice" in
+    1) NEW_MODS="{}"; NEW_KEY="F12" ;;
+    2) NEW_MODS="{}"; NEW_KEY="F11" ;;
+    3) NEW_MODS="{}"; NEW_KEY="F10" ;;
+    4) NEW_MODS="{}"; NEW_KEY="F9" ;;
+    5) NEW_MODS='{"ctrl", "shift"}'; NEW_KEY="space" ;;
+    6) NEW_MODS='{"cmd", "shift"}'; NEW_KEY="m" ;;
+    *)
+        echo "❌ Invalid choice"
+        exit 1
+        ;;
+esac
+
+# Update the config file
+sed -i '' "s/^local mods = .*/local mods = $NEW_MODS/" "$CONFIG_FILE"
+sed -i '' "s/^local key = .*/local key = \"$NEW_KEY\"/" "$CONFIG_FILE"
+
+# Update the alert message
+sed -i '' "s/Voice transcription ready ([^)]*)/Voice transcription ready ($NEW_KEY)/" "$CONFIG_FILE"
+
+echo "✓ Hotkey changed to: $NEW_KEY"
+echo ""
+echo "Reload Hammerspoon config: menu bar icon → Reload Config"
+HOTKEYEOF
+chmod +x /usr/local/bin/voice-ptt-hotkey 2>/dev/null || {
+    # If /usr/local/bin isn't writable, put it in ~/bin
+    mkdir -p "$HOME/bin"
+    mv /usr/local/bin/voice-ptt-hotkey "$HOME/bin/voice-ptt-hotkey" 2>/dev/null || cat > "$HOME/bin/voice-ptt-hotkey" << 'HOTKEYEOF'
+#!/bin/bash
+# voice-ptt-hotkey - Change the push-to-talk hotkey
+
+CONFIG_FILE="$HOME/.hammerspoon/init.lua"
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "❌ Hammerspoon config not found. Run the installer first."
+    exit 1
+fi
+
+echo "Current hotkey configuration:"
+grep -E "^local (mods|key) = " "$CONFIG_FILE" | head -2
+echo ""
+echo "Choose new hotkey:"
+echo ""
+echo "  1) F12"
+echo "  2) F11"
+echo "  3) F10"
+echo "  4) F9"
+echo "  5) Ctrl+Shift+Space"
+echo "  6) Cmd+Shift+M"
+echo ""
+read -p "Enter choice [1-6]: " -n 1 -r choice
+echo ""
+
+case "$choice" in
+    1) NEW_MODS="{}"; NEW_KEY="F12" ;;
+    2) NEW_MODS="{}"; NEW_KEY="F11" ;;
+    3) NEW_MODS="{}"; NEW_KEY="F10" ;;
+    4) NEW_MODS="{}"; NEW_KEY="F9" ;;
+    5) NEW_MODS='{"ctrl", "shift"}'; NEW_KEY="space" ;;
+    6) NEW_MODS='{"cmd", "shift"}'; NEW_KEY="m" ;;
+    *)
+        echo "❌ Invalid choice"
+        exit 1
+        ;;
+esac
+
+# Update the config file
+sed -i '' "s/^local mods = .*/local mods = $NEW_MODS/" "$CONFIG_FILE"
+sed -i '' "s/^local key = .*/local key = \"$NEW_KEY\"/" "$CONFIG_FILE"
+
+# Update the alert message
+sed -i '' "s/Voice transcription ready ([^)]*)/Voice transcription ready ($NEW_KEY)/" "$CONFIG_FILE"
+
+echo "✓ Hotkey changed to: $NEW_KEY"
+echo ""
+echo "Reload Hammerspoon config: menu bar icon → Reload Config"
+HOTKEYEOF
+    chmod +x "$HOME/bin/voice-ptt-hotkey"
+    echo "✓ Hotkey command installed to ~/bin/voice-ptt-hotkey"
+}
 
 echo
 
@@ -249,14 +395,14 @@ echo "   • System Settings → Privacy & Security → Microphone → Hammerspo
 echo
 echo "2. Click the Hammerspoon menu bar icon (hammer) → Reload Config"
 echo
-echo "3. Test it: Hold F12, speak, release F12"
+if [[ "$HOTKEY_MODS" == "{}" ]]; then
+    echo "3. Test it: Hold $HOTKEY_KEY, speak, release $HOTKEY_KEY"
+else
+    echo "3. Test it: Hold $HOTKEY_MODS+$HOTKEY_KEY, speak, release"
+fi
 echo
 echo "─────────────────────────────────────────────────────────────────"
-echo "Models installed:"
-echo "  • base (current)  - Fast (~1-3s)"
-echo "  • medium          - Accurate (~5-10s)"
-echo
-echo "To switch models, edit ~/.hammerspoon/init.lua line 8"
+echo "To change hotkey later, run: voice-ptt-hotkey"
 echo "─────────────────────────────────────────────────────────────────"
 echo
 

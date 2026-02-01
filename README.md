@@ -8,11 +8,29 @@ One-command push-to-talk voice transcription for macOS. 100% local, no cloud, po
 curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/install.sh -o /tmp/install.sh && bash /tmp/install.sh
 ```
 
+The installer will prompt you to choose a hotkey (F12, F11, Ctrl+Shift+Space, etc.).
+
 Then grant Hammerspoon **Accessibility** and **Microphone** permissions in System Settings.
 
 ## Usage
 
-Hold **F12** → speak → release **F12** → text appears at cursor
+Hold **your hotkey** → speak → release → text appears at cursor
+
+## Change Hotkey
+
+After installation, run:
+
+```bash
+voice-ptt-hotkey
+```
+
+Or manually edit `~/.hammerspoon/init.lua` and change:
+```lua
+local mods = {}
+local key = "F12"
+```
+
+Then reload: Hammerspoon menu → Reload Config
 
 ## Uninstall
 
@@ -35,19 +53,10 @@ brew uninstall --cask hammerspoon
 ## How it works
 
 ```
-F12 pressed → sox records audio → F12 released → whisper-cli transcribes → pastes to cursor
+Hotkey pressed → sox records audio → Hotkey released → whisper-cli transcribes → pastes to cursor
 ```
 
 All processing happens locally using Metal GPU acceleration. No data leaves your Mac.
-
-## Configuration
-
-Edit `~/.hammerspoon/init.lua`:
-
-- **Change hotkey**: Modify `local key = "F12"` (line 19)
-- **Switch model**: Change `ggml-base.en.bin` to `ggml-medium.en.bin` (line 9) for better accuracy
-
-Reload config: Hammerspoon menu → Reload Config
 
 ## Models
 
@@ -55,6 +64,12 @@ Reload config: Hammerspoon menu → Reload Config
 |-------|------|-------|----------|
 | base (default) | 142MB | ~1-3s | Good |
 | medium | 1.5GB | ~5-10s | Best |
+
+To switch models, edit `~/.hammerspoon/init.lua` line 9:
+```lua
+-- For better accuracy:
+local model = os.getenv("HOME") .. "/Library/Application Support/whisper.cpp/ggml-medium.en.bin"
+```
 
 ---
 
@@ -64,7 +79,7 @@ Reload config: Hammerspoon menu → Reload Config
 |-------|----------|
 | "Recording..." but nothing happens | Check Microphone permission for Hammerspoon |
 | Transcription doesn't paste | Check Accessibility permission for Hammerspoon |
-| F12 doesn't trigger | Hammerspoon menu → Reload Config |
+| Hotkey doesn't trigger | Hammerspoon menu → Reload Config |
 | Zombie sox processes | Run `pkill -9 sox` |
 
 ### Debug install issues
