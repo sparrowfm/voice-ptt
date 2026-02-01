@@ -49,31 +49,31 @@ echo
 echo "─────────────────────────────────────────────────────────────────"
 echo "Choose your push-to-talk hotkey:"
 echo ""
-echo "  1) Option+Space  (default - Alt key + Space)"
-echo "  2) F12"
-echo "  3) F11"
-echo "  4) F10"
-echo "  5) Ctrl+Shift+Space"
-echo "  6) Cmd+Shift+M"
+echo "  1) F3           (default - single key, works on all keyboards)"
+echo "  2) Option+Space (Alt key + Space)"
+echo "  3) F5"
+echo "  4) F6"
+echo "  5) F12"
+echo "  6) Ctrl+Shift+Space"
 echo ""
 
-HOTKEY_MODS='{"alt"}'
-HOTKEY_KEY="space"
+HOTKEY_MODS="{}"
+HOTKEY_KEY="F3"
 
 # Check if running interactively
 if [[ -t 0 ]]; then
     read -p "Enter choice [1-6, default=1]: " -n 1 -r hotkey_choice
     echo ""
     case "$hotkey_choice" in
-        2) HOTKEY_MODS="{}"; HOTKEY_KEY="F12" ;;
-        3) HOTKEY_MODS="{}"; HOTKEY_KEY="F11" ;;
-        4) HOTKEY_MODS="{}"; HOTKEY_KEY="F10" ;;
-        5) HOTKEY_MODS='{"ctrl", "shift"}'; HOTKEY_KEY="space" ;;
-        6) HOTKEY_MODS='{"cmd", "shift"}'; HOTKEY_KEY="m" ;;
-        *) HOTKEY_MODS='{"alt"}'; HOTKEY_KEY="space" ;;
+        2) HOTKEY_MODS='{"alt"}'; HOTKEY_KEY="space" ;;
+        3) HOTKEY_MODS="{}"; HOTKEY_KEY="F5" ;;
+        4) HOTKEY_MODS="{}"; HOTKEY_KEY="F6" ;;
+        5) HOTKEY_MODS="{}"; HOTKEY_KEY="F12" ;;
+        6) HOTKEY_MODS='{"ctrl", "shift"}'; HOTKEY_KEY="space" ;;
+        *) HOTKEY_MODS="{}"; HOTKEY_KEY="F3" ;;
     esac
 else
-    echo "Running non-interactively, using default: Option+Space"
+    echo "Running non-interactively, using default: F3"
 fi
 
 if [[ "$HOTKEY_MODS" == "{}" ]]; then
@@ -289,23 +289,23 @@ grep -E "^local (mods|key) = " "$CONFIG_FILE" | head -2
 echo ""
 echo "Choose new hotkey:"
 echo ""
-echo "  1) Option+Space  (Alt key + Space)"
-echo "  2) F12"
-echo "  3) F11"
-echo "  4) F10"
-echo "  5) Ctrl+Shift+Space"
-echo "  6) Cmd+Shift+M"
+echo "  1) F3           (single key, works on all keyboards)"
+echo "  2) Option+Space (Alt key + Space)"
+echo "  3) F5"
+echo "  4) F6"
+echo "  5) F12"
+echo "  6) Ctrl+Shift+Space"
 echo ""
 read -p "Enter choice [1-6]: " -n 1 -r choice
 echo ""
 
 case "$choice" in
-    1) NEW_MODS='{"alt"}'; NEW_KEY="space" ;;
-    2) NEW_MODS="{}"; NEW_KEY="F12" ;;
-    3) NEW_MODS="{}"; NEW_KEY="F11" ;;
-    4) NEW_MODS="{}"; NEW_KEY="F10" ;;
-    5) NEW_MODS='{"ctrl", "shift"}'; NEW_KEY="space" ;;
-    6) NEW_MODS='{"cmd", "shift"}'; NEW_KEY="m" ;;
+    1) NEW_MODS="{}"; NEW_KEY="F3" ;;
+    2) NEW_MODS='{"alt"}'; NEW_KEY="space" ;;
+    3) NEW_MODS="{}"; NEW_KEY="F5" ;;
+    4) NEW_MODS="{}"; NEW_KEY="F6" ;;
+    5) NEW_MODS="{}"; NEW_KEY="F12" ;;
+    6) NEW_MODS='{"ctrl", "shift"}'; NEW_KEY="space" ;;
     *)
         echo "❌ Invalid choice"
         exit 1
@@ -342,23 +342,23 @@ grep -E "^local (mods|key) = " "$CONFIG_FILE" | head -2
 echo ""
 echo "Choose new hotkey:"
 echo ""
-echo "  1) Option+Space  (Alt key + Space)"
-echo "  2) F12"
-echo "  3) F11"
-echo "  4) F10"
-echo "  5) Ctrl+Shift+Space"
-echo "  6) Cmd+Shift+M"
+echo "  1) F3           (single key, works on all keyboards)"
+echo "  2) Option+Space (Alt key + Space)"
+echo "  3) F5"
+echo "  4) F6"
+echo "  5) F12"
+echo "  6) Ctrl+Shift+Space"
 echo ""
 read -p "Enter choice [1-6]: " -n 1 -r choice
 echo ""
 
 case "$choice" in
-    1) NEW_MODS='{"alt"}'; NEW_KEY="space" ;;
-    2) NEW_MODS="{}"; NEW_KEY="F12" ;;
-    3) NEW_MODS="{}"; NEW_KEY="F11" ;;
-    4) NEW_MODS="{}"; NEW_KEY="F10" ;;
-    5) NEW_MODS='{"ctrl", "shift"}'; NEW_KEY="space" ;;
-    6) NEW_MODS='{"cmd", "shift"}'; NEW_KEY="m" ;;
+    1) NEW_MODS="{}"; NEW_KEY="F3" ;;
+    2) NEW_MODS='{"alt"}'; NEW_KEY="space" ;;
+    3) NEW_MODS="{}"; NEW_KEY="F5" ;;
+    4) NEW_MODS="{}"; NEW_KEY="F6" ;;
+    5) NEW_MODS="{}"; NEW_KEY="F12" ;;
+    6) NEW_MODS='{"ctrl", "shift"}'; NEW_KEY="space" ;;
     *)
         echo "❌ Invalid choice"
         exit 1
