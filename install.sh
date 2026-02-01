@@ -3,7 +3,7 @@
 # Usage: curl -fsSL URL | bash
 #    or: bash install-voice.sh
 
-set -e
+# Don't use set -e - handle errors explicitly to avoid silent failures
 
 echo "═══════════════════════════════════════════════════════════════"
 echo "  Push-to-Talk Voice Transcription Installer"
@@ -53,21 +53,30 @@ echo "────────────────────────�
 
 if ! command -v whisper-cli &> /dev/null; then
     echo "Installing whisper-cpp..."
-    brew install whisper-cpp
+    if ! brew install whisper-cpp; then
+        echo "❌ Failed to install whisper-cpp"
+        exit 1
+    fi
 else
     echo "✓ whisper-cpp already installed"
 fi
 
 if ! command -v sox &> /dev/null; then
     echo "Installing sox..."
-    brew install sox
+    if ! brew install sox; then
+        echo "❌ Failed to install sox"
+        exit 1
+    fi
 else
     echo "✓ sox already installed"
 fi
 
 if [[ ! -d "/Applications/Hammerspoon.app" ]]; then
     echo "Installing Hammerspoon..."
-    brew install --cask hammerspoon
+    if ! brew install --cask hammerspoon; then
+        echo "❌ Failed to install Hammerspoon"
+        exit 1
+    fi
 else
     echo "✓ Hammerspoon already installed"
 fi
@@ -100,6 +109,7 @@ download_model() {
         if [[ "$size" -gt 10000000 ]]; then
             mv "$tmp_path" "$path"
             echo "✓ $name downloaded successfully"
+            return 0
         else
             rm -f "$tmp_path"
             echo "❌ $name download failed (file too small: $size bytes)"
@@ -112,8 +122,8 @@ download_model() {
     fi
 }
 
-download_model "ggml-base.en.bin" "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
-download_model "ggml-medium.en.bin" "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.en.bin"
+download_model "ggml-base.en.bin" "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin" || echo "⚠ Continuing without base model"
+download_model "ggml-medium.en.bin" "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.en.bin" || echo "⚠ Continuing without medium model"
 
 echo
 
@@ -124,17 +134,17 @@ echo "────────────────────────�
 mkdir -p "$HOME/.hammerspoon"
 
 CONFIG_FILE="$HOME/.hammerspoon/init.lua"
+write_config=false
 
 # Backup existing config if it exists and doesn't have our config
 if [[ -f "$CONFIG_FILE" ]]; then
-    if grep -q "Push-to-Talk Whisper" "$CONFIG_FILE"; then
+    if grep -q "Push-to-Talk Whisper" "$CONFIG_FILE" 2>/dev/null; then
         echo "✓ Push-to-talk config already present in init.lua"
     else
         BACKUP_FILE="$HOME/.hammerspoon/init.lua.backup.$(date +%Y%m%d%H%M%S)"
         echo "Backing up existing init.lua to $(basename "$BACKUP_FILE")"
         cp "$CONFIG_FILE" "$BACKUP_FILE"
         echo "Creating new init.lua with push-to-talk config..."
-        # Write new config (replaces existing)
         write_config=true
     fi
 else
@@ -143,7 +153,7 @@ else
 fi
 
 # Write config if needed (new install or backup was made)
-if [[ "$write_config" == "true" ]] || [[ ! -f "$CONFIG_FILE" ]]; then
+if [[ "$write_config" == "true" ]]; then
 cat > "$CONFIG_FILE" << 'LUAEOF'
 -- Push-to-Talk Whisper Transcription
 -- Hold F12 to record, release to transcribe and paste
@@ -226,7 +236,7 @@ fi
 
 echo
 
-# Open Hammerspoon
+# Final instructions
 echo "═══════════════════════════════════════════════════════════════"
 echo "  Installation complete!"
 echo "═══════════════════════════════════════════════════════════════"
@@ -251,6 +261,8 @@ echo "────────────────────────�
 echo
 
 # Open Hammerspoon
+echo "Opening Hammerspoon..."
 open -a Hammerspoon
 
+echo
 echo "Done! You can close this terminal window."
