@@ -389,15 +389,73 @@ echo ""
 echo "Reload Hammerspoon config: menu bar icon → Reload Config"
 HOTKEYEOF
     chmod +x "$HOME/bin/voice-ptt-hotkey"
-    # Add ~/bin to PATH in .zshrc if not already there
-    if ! grep -q 'export PATH="$HOME/bin:$PATH"' "$HOME/.zshrc" 2>/dev/null; then
-        echo '' >> "$HOME/.zshrc"
-        echo '# Added by voice-ptt installer' >> "$HOME/.zshrc"
-        echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.zshrc"
-        echo "✓ Added ~/bin to PATH in ~/.zshrc"
-    fi
-    echo "✓ Hotkey command installed to ~/bin/voice-ptt-hotkey"
+    echo "✓ Hotkey command installed"
 }
+
+# Create model switch script
+cat > "$HOME/bin/voice-ptt-model" << 'MODELEOF'
+#!/bin/bash
+# voice-ptt-model - Switch between Whisper models
+
+CONFIG_FILE="$HOME/.hammerspoon/init.lua"
+MODEL_DIR="$HOME/Library/Application Support/whisper.cpp"
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "❌ Hammerspoon config not found. Run the installer first."
+    exit 1
+fi
+
+# Check current model
+current=$(grep "^local model = " "$CONFIG_FILE" | grep -o "ggml-[^.]*")
+echo "Current model: $current"
+echo ""
+echo "Choose model:"
+echo ""
+echo "  1) base   - Fast (~1-3s), good accuracy, 142MB"
+echo "  2) medium - Slower (~5-10s), best accuracy, 1.5GB"
+echo ""
+read -p "Enter choice [1-2]: " -n 1 -r choice
+echo ""
+
+case "$choice" in
+    1) NEW_MODEL="ggml-base.en.bin" ;;
+    2) NEW_MODEL="ggml-medium.en.bin" ;;
+    *)
+        echo "❌ Invalid choice"
+        exit 1
+        ;;
+esac
+
+# Check if model exists
+if [[ ! -f "$MODEL_DIR/$NEW_MODEL" ]]; then
+    echo "Model not downloaded. Downloading now..."
+    if [[ "$NEW_MODEL" == "ggml-base.en.bin" ]]; then
+        curl -L --progress-bar -o "$MODEL_DIR/$NEW_MODEL" \
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
+    else
+        curl -L --progress-bar -o "$MODEL_DIR/$NEW_MODEL" \
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.en.bin"
+    fi
+fi
+
+# Update config
+sed -i '' "s|ggml-base.en.bin|$NEW_MODEL|g" "$CONFIG_FILE"
+sed -i '' "s|ggml-medium.en.bin|$NEW_MODEL|g" "$CONFIG_FILE"
+
+echo "✓ Model changed to: $NEW_MODEL"
+echo ""
+echo "Reload Hammerspoon config: menu bar icon → Reload Config"
+MODELEOF
+chmod +x "$HOME/bin/voice-ptt-model"
+echo "✓ Model command installed"
+
+# Add ~/bin to PATH in .zshrc if not already there
+if ! grep -q 'export PATH="$HOME/bin:$PATH"' "$HOME/.zshrc" 2>/dev/null; then
+    echo '' >> "$HOME/.zshrc"
+    echo '# Added by voice-ptt installer' >> "$HOME/.zshrc"
+    echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.zshrc"
+    echo "✓ Added ~/bin to PATH in ~/.zshrc"
+fi
 
 echo
 

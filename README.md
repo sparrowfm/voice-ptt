@@ -58,18 +58,18 @@ Hotkey pressed → sox records audio → Hotkey released → whisper-cli transcr
 
 All processing happens locally using Metal GPU acceleration. No data leaves your Mac.
 
-## Models
+## Switch Models
+
+```bash
+voice-ptt-model
+```
 
 | Model | Size | Speed | Accuracy |
 |-------|------|-------|----------|
 | base (default) | 142MB | ~1-3s | Good |
 | medium | 1.5GB | ~5-10s | Best |
 
-To switch models, edit `~/.hammerspoon/init.lua` line 9:
-```lua
--- For better accuracy:
-local model = os.getenv("HOME") .. "/Library/Application Support/whisper.cpp/ggml-medium.en.bin"
-```
+Then reload: Hammerspoon menu → Reload Config
 
 ---
 
