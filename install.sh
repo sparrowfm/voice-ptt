@@ -406,6 +406,16 @@ echo "To change hotkey later, run: voice-ptt-hotkey"
 echo "─────────────────────────────────────────────────────────────────"
 echo
 
+# Trigger microphone permission for sox
+echo "─────────────────────────────────────────────────────────────────"
+echo "Triggering microphone permission..."
+echo "⚠️  If prompted, click ALLOW for microphone access!"
+echo ""
+/opt/homebrew/bin/sox -d -r 16000 -c 1 /tmp/mic_test.wav trim 0 1 2>/dev/null || true
+rm -f /tmp/mic_test.wav 2>/dev/null
+echo "✓ Microphone permission triggered"
+echo
+
 # Open Hammerspoon
 echo "Opening Hammerspoon..."
 open -a Hammerspoon
