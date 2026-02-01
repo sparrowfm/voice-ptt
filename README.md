@@ -8,7 +8,7 @@ One-command push-to-talk voice transcription for macOS. 100% local, no cloud, po
 curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/install.sh -o /tmp/install.sh && bash /tmp/install.sh
 ```
 
-The installer will prompt you to choose a hotkey (F12, F11, Ctrl+Shift+Space, etc.).
+The installer will prompt you to choose a hotkey (Option+Space, Ctrl+Space, etc.).
 
 Then grant Hammerspoon **Accessibility** and **Microphone** permissions in System Settings.
 
@@ -26,8 +26,8 @@ voice-ptt-hotkey
 
 Or manually edit `~/.hammerspoon/init.lua` and change:
 ```lua
-local mods = {}
-local key = "F12"
+local mods = {"alt"}
+local key = "space"
 ```
 
 Then reload: Hammerspoon menu → Reload Config
@@ -96,3 +96,14 @@ command -v sox && echo "✓ sox" || echo "✗ sox"
 ls /Applications/Hammerspoon.app && echo "✓ Hammerspoon" || echo "✗ Hammerspoon"
 ls ~/Library/Application\ Support/whisper.cpp/*.bin && echo "✓ Models" || echo "✗ Models"
 ```
+
+## Credits
+
+- [whisper.cpp](https://github.com/ggerganov/whisper.cpp) - High-performance Whisper inference by Georgi Gerganov
+- [Hammerspoon](https://www.hammerspoon.org/) - macOS automation tool
+- [SoX](http://sox.sourceforge.net/) - Sound eXchange audio utility
+- [OpenAI Whisper](https://github.com/openai/whisper) - Original speech recognition model
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
