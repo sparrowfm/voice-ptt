@@ -49,31 +49,31 @@ echo
 echo "─────────────────────────────────────────────────────────────────"
 echo "Choose your push-to-talk hotkey:"
 echo ""
-echo "  1) F12        (default - easy to reach)"
-echo "  2) F11"
-echo "  3) F10"
-echo "  4) F9"
+echo "  1) Cmd+Space  (default - Windows key + Space)"
+echo "  2) F12"
+echo "  3) F11"
+echo "  4) F10"
 echo "  5) Ctrl+Shift+Space"
 echo "  6) Cmd+Shift+M"
 echo ""
 
-HOTKEY_MODS="{}"
-HOTKEY_KEY="F12"
+HOTKEY_MODS='{"cmd"}'
+HOTKEY_KEY="space"
 
 # Check if running interactively
 if [[ -t 0 ]]; then
     read -p "Enter choice [1-6, default=1]: " -n 1 -r hotkey_choice
     echo ""
     case "$hotkey_choice" in
-        2) HOTKEY_KEY="F11" ;;
-        3) HOTKEY_KEY="F10" ;;
-        4) HOTKEY_KEY="F9" ;;
+        2) HOTKEY_MODS="{}"; HOTKEY_KEY="F12" ;;
+        3) HOTKEY_MODS="{}"; HOTKEY_KEY="F11" ;;
+        4) HOTKEY_MODS="{}"; HOTKEY_KEY="F10" ;;
         5) HOTKEY_MODS='{"ctrl", "shift"}'; HOTKEY_KEY="space" ;;
         6) HOTKEY_MODS='{"cmd", "shift"}'; HOTKEY_KEY="m" ;;
-        *) HOTKEY_KEY="F12" ;;
+        *) HOTKEY_MODS='{"cmd"}'; HOTKEY_KEY="space" ;;
     esac
 else
-    echo "Running non-interactively, using default: F12"
+    echo "Running non-interactively, using default: Cmd+Space"
 fi
 
 if [[ "$HOTKEY_MODS" == "{}" ]]; then
@@ -289,10 +289,10 @@ grep -E "^local (mods|key) = " "$CONFIG_FILE" | head -2
 echo ""
 echo "Choose new hotkey:"
 echo ""
-echo "  1) F12"
-echo "  2) F11"
-echo "  3) F10"
-echo "  4) F9"
+echo "  1) Cmd+Space  (Windows key + Space)"
+echo "  2) F12"
+echo "  3) F11"
+echo "  4) F10"
 echo "  5) Ctrl+Shift+Space"
 echo "  6) Cmd+Shift+M"
 echo ""
@@ -300,10 +300,10 @@ read -p "Enter choice [1-6]: " -n 1 -r choice
 echo ""
 
 case "$choice" in
-    1) NEW_MODS="{}"; NEW_KEY="F12" ;;
-    2) NEW_MODS="{}"; NEW_KEY="F11" ;;
-    3) NEW_MODS="{}"; NEW_KEY="F10" ;;
-    4) NEW_MODS="{}"; NEW_KEY="F9" ;;
+    1) NEW_MODS='{"cmd"}'; NEW_KEY="space" ;;
+    2) NEW_MODS="{}"; NEW_KEY="F12" ;;
+    3) NEW_MODS="{}"; NEW_KEY="F11" ;;
+    4) NEW_MODS="{}"; NEW_KEY="F10" ;;
     5) NEW_MODS='{"ctrl", "shift"}'; NEW_KEY="space" ;;
     6) NEW_MODS='{"cmd", "shift"}'; NEW_KEY="m" ;;
     *)
@@ -342,10 +342,10 @@ grep -E "^local (mods|key) = " "$CONFIG_FILE" | head -2
 echo ""
 echo "Choose new hotkey:"
 echo ""
-echo "  1) F12"
-echo "  2) F11"
-echo "  3) F10"
-echo "  4) F9"
+echo "  1) Cmd+Space  (Windows key + Space)"
+echo "  2) F12"
+echo "  3) F11"
+echo "  4) F10"
 echo "  5) Ctrl+Shift+Space"
 echo "  6) Cmd+Shift+M"
 echo ""
@@ -353,10 +353,10 @@ read -p "Enter choice [1-6]: " -n 1 -r choice
 echo ""
 
 case "$choice" in
-    1) NEW_MODS="{}"; NEW_KEY="F12" ;;
-    2) NEW_MODS="{}"; NEW_KEY="F11" ;;
-    3) NEW_MODS="{}"; NEW_KEY="F10" ;;
-    4) NEW_MODS="{}"; NEW_KEY="F9" ;;
+    1) NEW_MODS='{"cmd"}'; NEW_KEY="space" ;;
+    2) NEW_MODS="{}"; NEW_KEY="F12" ;;
+    3) NEW_MODS="{}"; NEW_KEY="F11" ;;
+    4) NEW_MODS="{}"; NEW_KEY="F10" ;;
     5) NEW_MODS='{"ctrl", "shift"}'; NEW_KEY="space" ;;
     6) NEW_MODS='{"cmd", "shift"}'; NEW_KEY="m" ;;
     *)
