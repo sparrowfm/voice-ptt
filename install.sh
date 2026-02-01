@@ -49,38 +49,36 @@ echo
 echo "─────────────────────────────────────────────────────────────────"
 echo "Choose your push-to-talk hotkey:"
 echo ""
-echo "  1) F3           (default - single key, works on all keyboards)"
-echo "  2) Option+Space (Alt key + Space)"
-echo "  3) F5"
-echo "  4) F6"
-echo "  5) F12"
-echo "  6) Ctrl+Shift+Space"
+echo "  1) Right Option/Alt  (default - single key, hold to record)"
+echo "  2) Option+Space      (Alt+Space on Windows keyboards)"
+echo "  3) Ctrl+Space"
+echo "  4) Cmd+Space         (Windows key+Space, may conflict with Spotlight)"
 echo ""
 
-HOTKEY_MODS="{}"
-HOTKEY_KEY="F3"
+HOTKEY_MODS='{"rightalt"}'
+HOTKEY_KEY="space"
 
 # Check if running interactively
 if [[ -t 0 ]]; then
-    read -p "Enter choice [1-6, default=1]: " -n 1 -r hotkey_choice
+    read -p "Enter choice [1-4, default=1]: " -n 1 -r hotkey_choice
     echo ""
     case "$hotkey_choice" in
         2) HOTKEY_MODS='{"alt"}'; HOTKEY_KEY="space" ;;
-        3) HOTKEY_MODS="{}"; HOTKEY_KEY="F5" ;;
-        4) HOTKEY_MODS="{}"; HOTKEY_KEY="F6" ;;
-        5) HOTKEY_MODS="{}"; HOTKEY_KEY="F12" ;;
-        6) HOTKEY_MODS='{"ctrl", "shift"}'; HOTKEY_KEY="space" ;;
-        *) HOTKEY_MODS="{}"; HOTKEY_KEY="F3" ;;
+        3) HOTKEY_MODS='{"ctrl"}'; HOTKEY_KEY="space" ;;
+        4) HOTKEY_MODS='{"cmd"}'; HOTKEY_KEY="space" ;;
+        *) HOTKEY_MODS='{"rightalt"}'; HOTKEY_KEY="space" ;;
     esac
 else
-    echo "Running non-interactively, using default: F3"
+    echo "Running non-interactively, using default: Right Alt"
 fi
 
-if [[ "$HOTKEY_MODS" == "{}" ]]; then
-    echo "✓ Hotkey selected: $HOTKEY_KEY"
-else
-    echo "✓ Hotkey selected: $HOTKEY_MODS + $HOTKEY_KEY"
-fi
+case "$HOTKEY_MODS" in
+    '{"rightalt"}') echo "✓ Hotkey selected: Right Option/Alt (hold to record)" ;;
+    '{"alt"}') echo "✓ Hotkey selected: Option+Space (Alt+Space)" ;;
+    '{"ctrl"}') echo "✓ Hotkey selected: Ctrl+Space" ;;
+    '{"cmd"}') echo "✓ Hotkey selected: Cmd+Space (Win+Space)" ;;
+    *) echo "✓ Hotkey selected: $HOTKEY_MODS + $HOTKEY_KEY" ;;
+esac
 echo
 
 # Install dependencies
@@ -191,6 +189,14 @@ fi
 
 # Write config if needed (new install or backup was made)
 if [[ "$write_config" == "true" ]]; then
+# Set display name for alert
+case "$HOTKEY_MODS" in
+    '{"rightalt"}') HOTKEY_DISPLAY="Right Option/Alt" ;;
+    '{"alt"}') HOTKEY_DISPLAY="Option+Space" ;;
+    '{"ctrl"}') HOTKEY_DISPLAY="Ctrl+Space" ;;
+    '{"cmd"}') HOTKEY_DISPLAY="Cmd+Space" ;;
+    *) HOTKEY_DISPLAY="$HOTKEY_KEY" ;;
+esac
 cat > "$CONFIG_FILE" << LUAEOF
 -- Push-to-Talk Whisper Transcription
 -- Hold hotkey to record, release to transcribe and paste
@@ -266,7 +272,7 @@ hs.hotkey.bind(mods, key,
   end
 )
 
-hs.alert.show("Voice transcription ready ($HOTKEY_KEY)")
+hs.alert.show("Voice transcription ready ($HOTKEY_DISPLAY)")
 LUAEOF
     echo "✓ Hammerspoon config created"
 fi
@@ -289,23 +295,19 @@ grep -E "^local (mods|key) = " "$CONFIG_FILE" | head -2
 echo ""
 echo "Choose new hotkey:"
 echo ""
-echo "  1) F3           (single key, works on all keyboards)"
-echo "  2) Option+Space (Alt key + Space)"
-echo "  3) F5"
-echo "  4) F6"
-echo "  5) F12"
-echo "  6) Ctrl+Shift+Space"
+echo "  1) Right Option/Alt  (single key, hold to record)"
+echo "  2) Option+Space      (Alt+Space on Windows keyboards)"
+echo "  3) Ctrl+Space"
+echo "  4) Cmd+Space         (Windows key+Space, may conflict with Spotlight)"
 echo ""
-read -p "Enter choice [1-6]: " -n 1 -r choice
+read -p "Enter choice [1-4]: " -n 1 -r choice
 echo ""
 
 case "$choice" in
-    1) NEW_MODS="{}"; NEW_KEY="F3" ;;
+    1) NEW_MODS='{"rightalt"}'; NEW_KEY="space" ;;
     2) NEW_MODS='{"alt"}'; NEW_KEY="space" ;;
-    3) NEW_MODS="{}"; NEW_KEY="F5" ;;
-    4) NEW_MODS="{}"; NEW_KEY="F6" ;;
-    5) NEW_MODS="{}"; NEW_KEY="F12" ;;
-    6) NEW_MODS='{"ctrl", "shift"}'; NEW_KEY="space" ;;
+    3) NEW_MODS='{"ctrl"}'; NEW_KEY="space" ;;
+    4) NEW_MODS='{"cmd"}'; NEW_KEY="space" ;;
     *)
         echo "❌ Invalid choice"
         exit 1
@@ -316,10 +318,17 @@ esac
 sed -i '' "s/^local mods = .*/local mods = $NEW_MODS/" "$CONFIG_FILE"
 sed -i '' "s/^local key = .*/local key = \"$NEW_KEY\"/" "$CONFIG_FILE"
 
-# Update the alert message
-sed -i '' "s/Voice transcription ready ([^)]*)/Voice transcription ready ($NEW_KEY)/" "$CONFIG_FILE"
+# Set display name and update the alert message
+case "$NEW_MODS" in
+    '{"rightalt"}') NEW_DISPLAY="Right Option/Alt" ;;
+    '{"alt"}') NEW_DISPLAY="Option+Space" ;;
+    '{"ctrl"}') NEW_DISPLAY="Ctrl+Space" ;;
+    '{"cmd"}') NEW_DISPLAY="Cmd+Space" ;;
+    *) NEW_DISPLAY="$NEW_KEY" ;;
+esac
+sed -i '' "s/Voice transcription ready ([^)]*)/Voice transcription ready ($NEW_DISPLAY)/" "$CONFIG_FILE"
 
-echo "✓ Hotkey changed to: $NEW_KEY"
+echo "✓ Hotkey changed to: $NEW_DISPLAY"
 echo ""
 echo "Reload Hammerspoon config: menu bar icon → Reload Config"
 HOTKEYEOF
@@ -342,23 +351,19 @@ grep -E "^local (mods|key) = " "$CONFIG_FILE" | head -2
 echo ""
 echo "Choose new hotkey:"
 echo ""
-echo "  1) F3           (single key, works on all keyboards)"
-echo "  2) Option+Space (Alt key + Space)"
-echo "  3) F5"
-echo "  4) F6"
-echo "  5) F12"
-echo "  6) Ctrl+Shift+Space"
+echo "  1) Right Option/Alt  (single key, hold to record)"
+echo "  2) Option+Space      (Alt+Space on Windows keyboards)"
+echo "  3) Ctrl+Space"
+echo "  4) Cmd+Space         (Windows key+Space, may conflict with Spotlight)"
 echo ""
-read -p "Enter choice [1-6]: " -n 1 -r choice
+read -p "Enter choice [1-4]: " -n 1 -r choice
 echo ""
 
 case "$choice" in
-    1) NEW_MODS="{}"; NEW_KEY="F3" ;;
+    1) NEW_MODS='{"rightalt"}'; NEW_KEY="space" ;;
     2) NEW_MODS='{"alt"}'; NEW_KEY="space" ;;
-    3) NEW_MODS="{}"; NEW_KEY="F5" ;;
-    4) NEW_MODS="{}"; NEW_KEY="F6" ;;
-    5) NEW_MODS="{}"; NEW_KEY="F12" ;;
-    6) NEW_MODS='{"ctrl", "shift"}'; NEW_KEY="space" ;;
+    3) NEW_MODS='{"ctrl"}'; NEW_KEY="space" ;;
+    4) NEW_MODS='{"cmd"}'; NEW_KEY="space" ;;
     *)
         echo "❌ Invalid choice"
         exit 1
@@ -369,10 +374,17 @@ esac
 sed -i '' "s/^local mods = .*/local mods = $NEW_MODS/" "$CONFIG_FILE"
 sed -i '' "s/^local key = .*/local key = \"$NEW_KEY\"/" "$CONFIG_FILE"
 
-# Update the alert message
-sed -i '' "s/Voice transcription ready ([^)]*)/Voice transcription ready ($NEW_KEY)/" "$CONFIG_FILE"
+# Set display name and update the alert message
+case "$NEW_MODS" in
+    '{"rightalt"}') NEW_DISPLAY="Right Option/Alt" ;;
+    '{"alt"}') NEW_DISPLAY="Option+Space" ;;
+    '{"ctrl"}') NEW_DISPLAY="Ctrl+Space" ;;
+    '{"cmd"}') NEW_DISPLAY="Cmd+Space" ;;
+    *) NEW_DISPLAY="$NEW_KEY" ;;
+esac
+sed -i '' "s/Voice transcription ready ([^)]*)/Voice transcription ready ($NEW_DISPLAY)/" "$CONFIG_FILE"
 
-echo "✓ Hotkey changed to: $NEW_KEY"
+echo "✓ Hotkey changed to: $NEW_DISPLAY"
 echo ""
 echo "Reload Hammerspoon config: menu bar icon → Reload Config"
 HOTKEYEOF
@@ -402,11 +414,13 @@ echo "   • System Settings → Privacy & Security → Microphone → Hammerspo
 echo
 echo "2. Click the Hammerspoon menu bar icon (hammer) → Reload Config"
 echo
-if [[ "$HOTKEY_MODS" == "{}" ]]; then
-    echo "3. Test it: Hold $HOTKEY_KEY, speak, release $HOTKEY_KEY"
-else
-    echo "3. Test it: Hold $HOTKEY_MODS+$HOTKEY_KEY, speak, release"
-fi
+case "$HOTKEY_MODS" in
+    '{"rightalt"}') echo "3. Test it: Hold Right Option/Alt, speak, release" ;;
+    '{"alt"}') echo "3. Test it: Hold Option+Space (Alt+Space), speak, release" ;;
+    '{"ctrl"}') echo "3. Test it: Hold Ctrl+Space, speak, release" ;;
+    '{"cmd"}') echo "3. Test it: Hold Cmd+Space (Win+Space), speak, release" ;;
+    *) echo "3. Test it: Hold hotkey, speak, release" ;;
+esac
 echo
 echo "─────────────────────────────────────────────────────────────────"
 echo "To change hotkey later, run: voice-ptt-hotkey"
