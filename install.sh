@@ -377,6 +377,13 @@ echo ""
 echo "Reload Hammerspoon config: menu bar icon → Reload Config"
 HOTKEYEOF
     chmod +x "$HOME/bin/voice-ptt-hotkey"
+    # Add ~/bin to PATH in .zshrc if not already there
+    if ! grep -q 'export PATH="$HOME/bin:$PATH"' "$HOME/.zshrc" 2>/dev/null; then
+        echo '' >> "$HOME/.zshrc"
+        echo '# Added by voice-ptt installer' >> "$HOME/.zshrc"
+        echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.zshrc"
+        echo "✓ Added ~/bin to PATH in ~/.zshrc"
+    fi
     echo "✓ Hotkey command installed to ~/bin/voice-ptt-hotkey"
 }
 
