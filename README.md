@@ -49,3 +49,21 @@ Reload config: Hammerspoon menu → Reload Config
 |-------|------|-------|----------|
 | base (default) | 142MB | ~1-3s | Good |
 | medium | 1.5GB | ~5-10s | Best |
+
+---
+
+## Debugging
+
+If installation fails, run with debug output:
+
+```bash
+bash -x <(curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/install.sh) 2>&1 | head -100
+```
+
+Check if Hammerspoon exists:
+
+```bash
+ls -la /Applications/Hammerspoon.app
+mdfind -name "Hammerspoon.app"
+brew list --cask | grep hammer
+```
