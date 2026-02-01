@@ -329,8 +329,8 @@ esac
 sed -i '' "s/Voice transcription ready ([^)]*)/Voice transcription ready ($NEW_DISPLAY)/" "$CONFIG_FILE"
 
 echo "✓ Hotkey changed to: $NEW_DISPLAY"
-echo ""
-echo "Reload Hammerspoon config: menu bar icon → Reload Config"
+open -g hammerspoon://reload
+echo "✓ Hammerspoon config reloaded"
 HOTKEYEOF
 chmod +x /usr/local/bin/voice-ptt-hotkey 2>/dev/null || {
     # If /usr/local/bin isn't writable, put it in ~/bin
@@ -385,8 +385,8 @@ esac
 sed -i '' "s/Voice transcription ready ([^)]*)/Voice transcription ready ($NEW_DISPLAY)/" "$CONFIG_FILE"
 
 echo "✓ Hotkey changed to: $NEW_DISPLAY"
-echo ""
-echo "Reload Hammerspoon config: menu bar icon → Reload Config"
+open -g hammerspoon://reload
+echo "✓ Hammerspoon config reloaded"
 HOTKEYEOF
     chmod +x "$HOME/bin/voice-ptt-hotkey"
     echo "✓ Hotkey command installed"
@@ -443,8 +443,8 @@ sed -i '' "s|ggml-base.en.bin|$NEW_MODEL|g" "$CONFIG_FILE"
 sed -i '' "s|ggml-medium.en.bin|$NEW_MODEL|g" "$CONFIG_FILE"
 
 echo "✓ Model changed to: $NEW_MODEL"
-echo ""
-echo "Reload Hammerspoon config: menu bar icon → Reload Config"
+open -g hammerspoon://reload
+echo "✓ Hammerspoon config reloaded"
 MODELEOF
 chmod +x "$HOME/bin/voice-ptt-model"
 echo "✓ Model command installed"
