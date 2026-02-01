@@ -5,7 +5,7 @@ One-command push-to-talk voice transcription for macOS. 100% local, no cloud, po
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/install.sh -o /tmp/install.sh && bash /tmp/install.sh
 ```
 
 Then grant Hammerspoon **Accessibility** and **Microphone** permissions in System Settings.
@@ -17,7 +17,13 @@ Hold **F12** → speak → release **F12** → text appears at cursor
 ## Uninstall
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/uninstall.sh -o /tmp/uninstall.sh && bash /tmp/uninstall.sh
+```
+
+To fully remove apps after uninstalling:
+```bash
+brew uninstall whisper-cpp sox
+brew uninstall --cask hammerspoon
 ```
 
 ## Requirements
@@ -52,18 +58,26 @@ Reload config: Hammerspoon menu → Reload Config
 
 ---
 
-## Debugging
+## Troubleshooting
 
-If installation fails, run with debug output:
+| Issue | Solution |
+|-------|----------|
+| "Recording..." but nothing happens | Check Microphone permission for Hammerspoon |
+| Transcription doesn't paste | Check Accessibility permission for Hammerspoon |
+| F12 doesn't trigger | Hammerspoon menu → Reload Config |
+| Zombie sox processes | Run `pkill -9 sox` |
+
+### Debug install issues
 
 ```bash
-bash -x <(curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/install.sh) 2>&1 | head -100
+bash -x /tmp/install.sh 2>&1 | tee /tmp/install.log
 ```
 
-Check if Hammerspoon exists:
+### Verify installation
 
 ```bash
-ls -la /Applications/Hammerspoon.app
-mdfind -name "Hammerspoon.app"
-brew list --cask | grep hammer
+command -v whisper-cli && echo "✓ whisper-cli" || echo "✗ whisper-cli"
+command -v sox && echo "✓ sox" || echo "✗ sox"
+ls /Applications/Hammerspoon.app && echo "✓ Hammerspoon" || echo "✗ Hammerspoon"
+ls ~/Library/Application\ Support/whisper.cpp/*.bin && echo "✓ Models" || echo "✗ Models"
 ```
