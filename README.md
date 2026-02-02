@@ -59,7 +59,8 @@ brew uninstall --cask hammerspoon
 
 - macOS on Apple Silicon (M1/M2/M3/M4)
 - [Homebrew](https://brew.sh)
-- ~2GB disk space
+- ~200MB disk space (base model)
+- ~1.7GB additional if you upgrade to medium model
 
 ## How it works
 
@@ -71,6 +72,8 @@ All processing happens locally using Metal GPU acceleration. No data leaves your
 
 ## Switch Models
 
+The installer downloads only the base model (142MB). For better accuracy, you can upgrade to medium:
+
 ```bash
 voice-ptt-model
 ```
@@ -80,7 +83,7 @@ voice-ptt-model
 | base (default) | 142MB | ~1-3s | Good |
 | medium | 1.5GB | ~5-10s | Best |
 
-Then reload: Hammerspoon menu → Reload Config
+The medium model downloads on-demand when you first select it.
 
 ---
 

@@ -156,8 +156,15 @@ download_model() {
     fi
 }
 
-download_model "ggml-base.en.bin" "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin" || echo "⚠ Continuing without base model"
-download_model "ggml-medium.en.bin" "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.en.bin" || echo "⚠ Continuing without medium model"
+download_model "ggml-base.en.bin" "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin" || {
+    echo "❌ Failed to download base model. Cannot continue."
+    exit 1
+}
+
+echo ""
+echo "ℹ️  Using base model (fast, ~1-3s transcription)"
+echo "   For better accuracy, run: voice-ptt-model"
+echo "   (Downloads 1.5GB medium model on demand)"
 
 echo
 
