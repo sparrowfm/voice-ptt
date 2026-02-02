@@ -135,6 +135,12 @@ open -g hammerspoon://reload
 
 Now the helper commands reload automatically. One less step.
 
+## Gotcha #9: Don't Make Users Download 1.5GB Upfront
+
+The original installer downloaded both the base model (142MB) and the medium model (1.5GB). That's a ~1.6GB download before users can even try the tool. Most people will be fine with the base model - it's fast and accurate enough for everyday dictation.
+
+Now the installer downloads only the base model. If users want better accuracy, they can run `voice-ptt-model` and it downloads medium on-demand. This cut install size by 90% and makes the first-run experience much faster.
+
 ## The Result
 
 **[voice-ptt](https://github.com/sparrowfm/voice-ptt)** - a one-command installer that sets up push-to-talk voice transcription on any M-series Mac.
