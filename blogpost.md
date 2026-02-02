@@ -24,7 +24,7 @@ After some research, the pieces fell into place:
 
 - **[SoX](http://sox.sourceforge.net/)** - The "Swiss Army knife of audio" - a simple command-line tool that's been processing audio since 1991. Records from the mic to a WAV file.
 
-- **Whisper models** - Downloaded once, stored locally. The "base" model (142MB) transcribes in 1-3 seconds. The "medium" model (1.5GB) takes 5-10 seconds but catches more nuance.
+- **Whisper models** - Downloaded once, stored locally. The installer downloads the "base" model (142MB) which transcribes in 1-3 seconds. If you want better accuracy, you can upgrade to the "medium" model (1.5GB, 5-10 seconds) on-demand.
 
 ## The Build
 
