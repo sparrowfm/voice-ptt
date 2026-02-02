@@ -103,7 +103,7 @@ The solution: download first, then run:
 curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 ```
 
-One extra step, but it actually works reliably.
+One extra step, but it actually works reliably. The installer also auto-installs Homebrew if it's missing, so users on fresh Macs don't need to do anything first.
 
 ## Gotcha #6: ~/bin Isn't in PATH
 
