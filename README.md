@@ -58,9 +58,10 @@ brew uninstall --cask hammerspoon
 ## Requirements
 
 - macOS on Apple Silicon (M1/M2/M3/M4)
-- [Homebrew](https://brew.sh)
 - ~200MB disk space (base model)
 - ~1.7GB additional if you upgrade to medium model
+
+Homebrew is installed automatically if not present.
 
 ## How it works
 
