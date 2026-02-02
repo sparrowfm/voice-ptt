@@ -34,11 +34,23 @@ elif [[ -x "/usr/local/bin/brew" ]]; then
 fi
 
 if [[ -z "$BREW_PATH" ]]; then
-    echo "❌ Homebrew not found. Install it first:"
-    echo '   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-    echo ""
-    echo "   Then run this installer again."
-    exit 1
+    echo "Homebrew not found. Installing..."
+    echo "─────────────────────────────────────────────────────────────────"
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+    # Set up brew path after install
+    if [[ -x "/opt/homebrew/bin/brew" ]]; then
+        BREW_PATH="/opt/homebrew/bin/brew"
+        eval "$($BREW_PATH shellenv)"
+    elif [[ -x "/usr/local/bin/brew" ]]; then
+        BREW_PATH="/usr/local/bin/brew"
+        eval "$($BREW_PATH shellenv)"
+    else
+        echo "❌ Homebrew installation failed."
+        exit 1
+    fi
+    echo "✓ Homebrew installed"
+    echo
 fi
 
 echo "✓ macOS on Apple Silicon detected"
