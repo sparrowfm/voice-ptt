@@ -664,9 +664,9 @@ rm -f /tmp/mic_test.wav 2>/dev/null
 echo "✓ Microphone permission triggered"
 echo
 
-# Open Hammerspoon
+# Open Hammerspoon (in background, without showing console)
 echo "Opening Hammerspoon..."
-open -a Hammerspoon
+open -g -a Hammerspoon
 
 echo
 echo "Done! You can close this terminal window."
