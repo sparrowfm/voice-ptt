@@ -85,6 +85,42 @@ local key = "$HOTKEY_KEY"   -- e.g., "space"
 
 Users can change via `voice-ptt-hotkey` command or manual edit.
 
+## Ollama Integration (Advanced Cleanup)
+
+### Homebrew Package Distinction
+- **Two packages**: `brew install ollama` (CLI wrapper) ≠ `brew install --cask ollama` (actual app)
+- **Wrapper fails** with "could not find ollama app" if app not installed
+- **Always use** `--cask` in documentation and scripts
+- **Detection**: Check `/Applications/Ollama.app` exists OR `ollama list` works
+
+### Service Requirements
+- Ollama service must be running for `ollama pull` to work
+- Start: `ollama serve &` or `/Applications/Ollama.app/Contents/Resources/ollama serve &`
+- Check: `pgrep -x ollama`
+- API endpoint: `http://localhost:11434`
+
+### Common Install Locations
+- `/opt/homebrew/bin/ollama` (Apple Silicon Homebrew)
+- `/usr/local/bin/ollama` (Intel Homebrew)
+- `~/.ollama/ollama` (manual install)
+- `/Applications/Ollama.app/Contents/Resources/ollama` (app bundle)
+
+### Text Processing Pipeline
+```
+Whisper transcription
+  ↓ Remove internal newlines
+  ↓ Basic cleanup (filler words)
+  ↓ Custom dictionary (find/replace)
+  ↓ Advanced LLM cleanup (if enabled, uses dictionary as context)
+  ↓ Paste to cursor
+```
+
+### Custom Dictionary
+- **Location**: `~/.config/voice-ptt/dictionary.txt`
+- **Format**: `FIND -> REPLACE` or `(?i)FIND -> REPLACE` (case-insensitive)
+- **Two-tier**: Basic (instant) + Advanced (LLM context)
+- **Management**: `voice-ptt-dictionary` command
+
 ## Gotchas
 
 - **Bash heredocs**: Use `<< 'EOF'` (quoted) to prevent shell variable expansion in Lua code
@@ -92,6 +128,7 @@ Users can change via `voice-ptt-hotkey` command or manual edit.
 - **sox permissions**: Microphone access triggered during install (`trim 0 1` for 1-second test)
 - **Hammerspoon reload**: Use `open -g hammerspoon://reload` to reload without focusing
 - **Update script not embedded**: `update.sh` exists in repo but is recreated as `voice-ptt-update` during install
+- **Ollama wrapper vs app**: "could not find ollama app" = have wrapper, need `brew install --cask ollama`
 
 ## Repository
 
