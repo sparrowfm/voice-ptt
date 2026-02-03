@@ -3,7 +3,7 @@
 # Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install-voice.sh
 
-VERSION="1.1.0"  # Update this when making changes
+VERSION="1.2.0"  # Update this when making changes
 
 echo "═══════════════════════════════════════════════════════════════"
 echo "  Push-to-Talk Voice Transcription Installer"
@@ -276,9 +276,20 @@ hs.hotkey.bind(mods, key,
             local text = f:read("*all")
             f:close()
             -- Remove internal newlines (whisper adds these during segmentation)
-            -- then trim leading/trailing whitespace
             text = text:gsub("\n", " "):gsub("^%s+", ""):gsub("%s+$", "")
+
             if text and text ~= "" then
+              -- Apply basic cleanup (always enabled)
+              text = basicCleanup(text)
+
+              -- Apply advanced LLM cleanup if enabled
+              if advancedCleanupEnabled and ollamaPath then
+                local cleaned = advancedCleanup(text, ollamaPath)
+                if cleaned then
+                  text = cleaned
+                end
+              end
+
               hs.pasteboard.setContents(text)
               hs.eventtap.keyStroke({"cmd"}, "v")
               hs.alert.show("Done")
@@ -299,6 +310,80 @@ hs.hotkey.bind(mods, key,
     whisperTask:start()
   end
 )
+
+-- Text cleanup functions
+local function basicCleanup(text)
+  -- Remove common filler words (basic regex approach)
+  text = text:gsub("%f[%a]um%f[%A]", "")
+  text = text:gsub("%f[%a]uh%f[%A]", "")
+  text = text:gsub("%f[%a]like%f[%A]", "")
+  text = text:gsub("%f[%a]you know%f[%A]", "")
+
+  -- Collapse multiple spaces
+  text = text:gsub("%s+", " ")
+
+  -- Capitalize first letter
+  text = text:gsub("^%l", string.upper)
+
+  return text:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function findOllama()
+  -- Check PATH first
+  local inPath = hs.execute("command -v ollama 2>/dev/null")
+  if inPath and inPath ~= "" then
+    return inPath:gsub("\n", "")
+  end
+
+  -- Common install locations
+  local locations = {
+    "/opt/homebrew/bin/ollama",
+    "/usr/local/bin/ollama",
+    os.getenv("HOME") .. "/.ollama/ollama",
+    "/Applications/Ollama.app/Contents/Resources/ollama"
+  }
+
+  for _, path in ipairs(locations) do
+    local check = io.open(path, "r")
+    if check then
+      check:close()
+      return path
+    end
+  end
+
+  return nil
+end
+
+local function advancedCleanup(text, ollamaPath)
+  -- LLM-based cleanup (requires Ollama)
+  local prompt = "Remove filler words (um, uh, like, you know) and fix punctuation. Keep meaning and style. Output only the cleaned text:\n\n" .. text
+
+  -- Escape single quotes for shell
+  prompt = prompt:gsub("'", "'\\\\''")
+
+  local cmd = ollamaPath .. " run llama3.2:1b '" .. prompt .. "' 2>/dev/null"
+  local result, status = hs.execute(cmd)
+
+  if status and result and result ~= "" then
+    return result:gsub("^%s+", ""):gsub("%s+$", "")
+  end
+
+  return nil  -- Fallback to basic cleanup
+end
+
+-- Check if advanced cleanup is enabled
+local advancedCleanupEnabled = false
+local ollamaPath = nil
+
+local cleanupConfigFile = os.getenv("HOME") .. "/.config/voice-ptt/cleanup-enabled"
+local f = io.open(cleanupConfigFile, "r")
+if f then
+  f:close()
+  ollamaPath = findOllama()
+  if ollamaPath then
+    advancedCleanupEnabled = true
+  end
+end
 
 -- Auto-update checker (runs every 7 days)
 local function checkForUpdates()
@@ -618,6 +703,119 @@ echo "✓ Done"
 UPDATEEOF
 chmod +x "$HOME/bin/voice-ptt-update"
 echo "✓ Update command installed"
+
+# Create cleanup toggle script
+cat > "$HOME/bin/voice-ptt-cleanup" << 'CLEANUPEOF'
+#!/bin/bash
+# voice-ptt-cleanup - Toggle advanced LLM-based text cleanup
+
+CLEANUP_FILE="$HOME/.config/voice-ptt/cleanup-enabled"
+
+show_status() {
+  echo "==================================================================="
+  echo "  voice-ptt Text Cleanup Status"
+  echo "==================================================================="
+  echo ""
+  echo "Basic cleanup: ENABLED (always on)"
+  echo "  - Removes: um, uh, like, you know"
+  echo "  - Capitalizes first letter"
+  echo "  - No performance impact"
+  echo ""
+
+  if [[ -f "$CLEANUP_FILE" ]]; then
+    echo "Advanced cleanup: ENABLED"
+    if command -v ollama &> /dev/null; then
+      echo "  - Ollama: $(command -v ollama)"
+      if ollama list 2>/dev/null | grep -q "llama3.2:1b"; then
+        echo "  - Model: llama3.2:1b (ready)"
+      else
+        echo "  - Model: llama3.2:1b (not downloaded)"
+      fi
+    else
+      echo "  - Ollama: NOT FOUND (cleanup won't work)"
+    fi
+    echo "  - Adds ~1-2s latency"
+  else
+    echo "Advanced cleanup: DISABLED"
+  fi
+}
+
+enable_advanced() {
+  echo "==================================================================="
+  echo "  Enable Advanced Cleanup"
+  echo "==================================================================="
+  echo ""
+
+  # Check for Ollama
+  if ! command -v ollama &> /dev/null; then
+    echo "❌ Ollama not found."
+    echo ""
+    echo "Install Ollama first:"
+    echo "  brew install ollama"
+    echo "  OR visit https://ollama.ai"
+    exit 1
+  fi
+
+  echo "✓ Ollama found: $(command -v ollama)"
+  echo ""
+
+  # Check if model exists
+  if ! ollama list 2>/dev/null | grep -q "llama3.2:1b"; then
+    echo "Downloading llama3.2:1b model (~1.3GB, one-time)..."
+    echo "This may take a few minutes..."
+    echo ""
+    if ! ollama pull llama3.2:1b; then
+      echo "❌ Failed to download model"
+      exit 1
+    fi
+  else
+    echo "✓ Model llama3.2:1b already downloaded"
+  fi
+
+  # Enable cleanup
+  mkdir -p "$(dirname "$CLEANUP_FILE")"
+  touch "$CLEANUP_FILE"
+
+  # Reload Hammerspoon
+  open -g hammerspoon://reload
+
+  echo ""
+  echo "✓ Advanced cleanup enabled"
+  echo "  Adds ~1-2s to transcription time"
+  echo ""
+  echo "To disable: voice-ptt-cleanup disable"
+}
+
+disable_advanced() {
+  rm -f "$CLEANUP_FILE"
+  open -g hammerspoon://reload
+  echo "✓ Advanced cleanup disabled"
+  echo "  Basic cleanup still active (always on)"
+}
+
+case "${1:-status}" in
+  enable)
+    enable_advanced
+    ;;
+  disable)
+    disable_advanced
+    ;;
+  status)
+    show_status
+    ;;
+  *)
+    echo "Usage: voice-ptt-cleanup [enable|disable|status]"
+    echo ""
+    echo "Commands:"
+    echo "  enable   - Enable advanced LLM cleanup (requires Ollama)"
+    echo "  disable  - Disable advanced cleanup (basic cleanup remains)"
+    echo "  status   - Show current cleanup status (default)"
+    exit 1
+    ;;
+esac
+CLEANUPEOF
+chmod +x "$HOME/bin/voice-ptt-cleanup"
+echo "✓ Cleanup command installed"
 
 # Store version for update checking
 mkdir -p "$HOME/.config/voice-ptt"

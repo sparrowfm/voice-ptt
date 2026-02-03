@@ -27,6 +27,13 @@ Then grant Hammerspoon **Accessibility** and **Microphone** permissions in Syste
 
 Hold **your hotkey** → speak → release → text appears at cursor
 
+**Text cleanup** is automatically applied:
+- Removes filler words: "um", "uh", "like", "you know"
+- Capitalizes first letter
+- No performance impact
+
+For even better results, enable [Advanced Cleanup](#advanced-cleanup-optional) with Ollama.
+
 ## Updates
 
 **Automatic checking**: voice-ptt checks GitHub for updates every 7 days and shows a notification when a new version is available.
@@ -96,6 +103,47 @@ voice-ptt-model
 | medium | 1.5GB | ~5-10s | Best |
 
 The medium model downloads on-demand when you first select it.
+
+## Advanced Cleanup (Optional)
+
+Voice-ptt includes **two-tier text cleanup**:
+
+### Basic Cleanup (Always On)
+Automatically applied to all transcriptions:
+- Removes filler words: "um", "uh", "like", "you know"
+- Capitalizes first letter
+- Collapses extra whitespace
+- **No performance impact** - instant
+
+### Advanced Cleanup (Optional)
+For even better results, enable LLM-based cleanup with Ollama:
+
+```bash
+voice-ptt-cleanup enable
+```
+
+**What it adds:**
+- Intelligent punctuation fixes
+- Better filler word detection in context
+- Preserves your speaking style and meaning
+- **Adds ~1-2s** to transcription time
+
+**Requirements:**
+- [Ollama](https://ollama.ai) installed: `brew install ollama`
+- Downloads llama3.2:1b model (~1.3GB, one-time)
+- Runs 100% locally (like Whisper)
+
+**Commands:**
+```bash
+voice-ptt-cleanup enable    # Enable advanced cleanup
+voice-ptt-cleanup disable   # Disable (basic cleanup remains)
+voice-ptt-cleanup status    # Check current status
+```
+
+**How it works:**
+```
+Whisper transcription → Basic cleanup (instant) → Advanced cleanup (if enabled, ~1-2s) → Paste
+```
 
 ---
 
