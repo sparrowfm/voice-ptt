@@ -1,137 +1,164 @@
-# voice-ptt
+# 🎤 voice-ptt
 
-One-command push-to-talk voice transcription for macOS. 100% local, no cloud, powered by Whisper AI on Apple Silicon.
+**Talk. Done.** One-command push-to-talk voice transcription for macOS. 100% local, no cloud, powered by Whisper AI on Apple Silicon.
 
-## Why Local?
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-blue?style=flat-square" alt="Platform">
+  <img src="https://img.shields.io/badge/privacy-100%25%20local-green?style=flat-square" alt="Privacy">
+  <img src="https://img.shields.io/github/v/release/sparrowfm/voice-ptt?style=flat-square" alt="Release">
+  <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="License">
+</p>
 
-Your voice is personal. Every word you dictate - emails to colleagues, notes about clients, personal journal entries, medical information, legal documents - deserves privacy.
+---
 
-Cloud-based transcription means your audio is uploaded to remote servers, processed by third parties, and potentially stored indefinitely. With voice-ptt, **nothing ever leaves your Mac**. Your voice data stays on your machine, processed entirely by your own hardware.
-
-- **No subscriptions** - One-time install, works forever
-- **No internet required** - Works offline, on airplanes, anywhere
-- **No data collection** - Zero telemetry, zero tracking
-- **No usage limits** - Transcribe as much as you want
-
-## Install
+## ⚡ Quick Start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/install.sh -o /tmp/install.sh && bash /tmp/install.sh
+curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/install.sh | bash
 ```
 
-The installer will prompt you to choose a hotkey (Option+Space, Ctrl+Space, etc.).
+**That's it.** Choose your hotkey, grant permissions, start dictating.
 
-Then grant Hammerspoon **Accessibility** and **Microphone** permissions in System Settings.
+Hold **Option+Space** (or your chosen hotkey) → speak → release → text appears instantly at your cursor. No clicking, no menus, no interruptions.
 
-## Usage
+---
 
-Hold **your hotkey** → speak → release → text appears at cursor
+## 🔒 Why Local?
 
-**Text cleanup** is automatically applied:
+Your voice is personal. **Every. Single. Word.** Emails to colleagues. Notes about clients. Personal journal entries. Medical information. Legal documents.
+
+**Cloud transcription = Your audio uploaded to remote servers, processed by third parties, potentially stored indefinitely.**
+
+**voice-ptt = Nothing ever leaves your Mac.** Your voice data stays on your machine, processed entirely by your own hardware.
+
+### The Freedom of Local
+
+- 🚫 **No subscriptions** - One-time install, yours forever
+- ✈️ **No internet required** - Works offline, on planes, in the wilderness
+- 👻 **No data collection** - Zero telemetry, zero tracking, zero surveillance
+- ∞ **No usage limits** - Transcribe as much as you want, whenever you want
+
+---
+
+## 🎯 Features
+
+### ⚡ Lightning Fast
+- **Base model**: 1-3 seconds transcription time
+- **Metal GPU acceleration** on Apple Silicon
+- Push-to-talk feels instant
+
+### 🧹 Smart Cleanup (Two-Tier)
+
+**Basic cleanup (always on, instant):**
 - Removes filler words: "um", "uh", "like", "you know"
 - Capitalizes first letter
-- No performance impact
+- Collapses extra whitespace
 
-For even better results, enable [Advanced Cleanup](#advanced-cleanup-optional) with Ollama.
+**Advanced cleanup (optional, +1-2s):**
+- Intelligent punctuation fixes
+- Context-aware filler word detection
+- Preserves your speaking style and meaning
+- Powered by local LLM (Ollama + llama3.2:1b)
 
-## Updates
-
-**Automatic checking**: voice-ptt checks GitHub for updates every 7 days and shows a notification when a new version is available.
-
-**Manual update**:
+### 🔄 Auto-Updates
+Checks GitHub every 7 days, notifies you when updates are available. One command to update:
 ```bash
 voice-ptt-update
 ```
 
-Downloads and applies the latest version while preserving your hotkey settings.
+### 🎛️ Flexible Configuration
+- Switch between base (142MB) and medium (1.5GB) models
+- Change hotkey anytime
+- Toggle advanced cleanup on/off
+- All settings preserved across updates
 
-## Change Hotkey
+---
 
-After installation, run:
+## 📦 Installation
 
+### One-Line Install
 ```bash
-voice-ptt-hotkey
+curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/install.sh | bash
 ```
 
-Or manually edit `~/.hammerspoon/init.lua` and change:
-```lua
-local mods = {"alt"}
-local key = "space"
-```
+The installer will:
+1. Install Homebrew (if needed)
+2. Install dependencies (Whisper, SoX, Hammerspoon)
+3. Download the Whisper base model (~142MB)
+4. Prompt you to choose a hotkey
+5. Configure advanced cleanup (optional, if Ollama detected)
 
-Then reload: Hammerspoon menu → Reload Config
+**Then grant permissions:**
+- System Settings → Privacy & Security → Accessibility → Enable Hammerspoon
+- System Settings → Privacy & Security → Microphone → Enable Hammerspoon
 
-## Uninstall
+**Done.** Start dictating.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/uninstall.sh -o /tmp/uninstall.sh && bash /tmp/uninstall.sh
-```
-
-To fully remove apps after uninstalling:
-```bash
-brew uninstall whisper-cpp sox
-brew uninstall --cask hammerspoon
-```
-
-## Requirements
+### Requirements
 
 - macOS on Apple Silicon (M1/M2/M3/M4)
 - ~200MB disk space (base model)
-- ~1.7GB additional if you upgrade to medium model
+- ~1.7GB additional for medium model (optional)
+- ~1.3GB additional for advanced cleanup (optional)
 
 Homebrew is installed automatically if not present.
 
-## How it works
+---
 
-```
-Hotkey pressed → sox records audio → Hotkey released → whisper-cli transcribes → pastes to cursor
-```
+## 🚀 Usage
 
-All processing happens locally using Metal GPU acceleration. No data leaves your Mac.
+### Basic Dictation
 
-## Switch Models
+1. **Position cursor** where you want text
+2. **Hold hotkey** (Option+Space by default)
+3. **Speak naturally**
+4. **Release hotkey**
+5. **Text appears** instantly
 
-The installer downloads only the base model (142MB). For better accuracy, you can upgrade to medium:
+That's it. No clicking, no switching apps, no breaking your flow.
+
+### Switch Models
 
 ```bash
 voice-ptt-model
 ```
 
-| Model | Size | Speed | Accuracy |
-|-------|------|-------|----------|
-| base (default) | 142MB | ~1-3s | Good |
-| medium | 1.5GB | ~5-10s | Best |
+| Model | Size | Speed | Accuracy | Best For |
+|-------|------|-------|----------|----------|
+| **base** (default) | 142MB | 1-3s | Good | Quick notes, emails, casual writing |
+| **medium** | 1.5GB | 5-10s | Excellent | Technical writing, accuracy-critical work |
 
-The medium model downloads on-demand when you first select it.
-
-## Advanced Cleanup (Optional)
-
-Voice-ptt includes **two-tier text cleanup**:
-
-### Basic Cleanup (Always On)
-Automatically applied to all transcriptions:
-- Removes filler words: "um", "uh", "like", "you know"
-- Capitalizes first letter
-- Collapses extra whitespace
-- **No performance impact** - instant
-
-### Advanced Cleanup (Optional)
-For even better results, enable LLM-based cleanup with Ollama:
+### Change Hotkey
 
 ```bash
+voice-ptt-hotkey
+```
+
+Or manually edit `~/.hammerspoon/init.lua`:
+```lua
+local mods = {"alt"}      -- "alt", "ctrl", "cmd", "shift"
+local key = "space"       -- Any key
+```
+
+Then reload: **Hammerspoon menu → Reload Config**
+
+### Advanced Cleanup
+
+Enable LLM-based text refinement (requires Ollama):
+
+```bash
+# Install Ollama (if not already installed)
+brew install ollama
+
+# Enable advanced cleanup
 voice-ptt-cleanup enable
 ```
 
 **What it adds:**
-- Intelligent punctuation fixes
-- Better filler word detection in context
-- Preserves your speaking style and meaning
-- **Adds ~1-2s** to transcription time
-
-**Requirements:**
-- [Ollama](https://ollama.ai) installed: `brew install ollama`
-- Downloads llama3.2:1b model (~1.3GB, one-time)
-- Runs 100% locally (like Whisper)
+- Better punctuation
+- Context-aware filler word removal
+- Style preservation
+- ~1-2s additional processing time
 
 **Commands:**
 ```bash
@@ -140,29 +167,39 @@ voice-ptt-cleanup disable   # Disable (basic cleanup remains)
 voice-ptt-cleanup status    # Check current status
 ```
 
-**How it works:**
-```
-Whisper transcription → Basic cleanup (instant) → Advanced cleanup (if enabled, ~1-2s) → Paste
-```
+---
+
+## 🔧 Commands
+
+After installation, these commands are available:
+
+| Command | Purpose |
+|---------|---------|
+| `voice-ptt-update` | Update to latest version |
+| `voice-ptt-hotkey` | Change hotkey binding |
+| `voice-ptt-model` | Switch between base/medium models |
+| `voice-ptt-cleanup` | Enable/disable/check advanced cleanup |
 
 ---
 
-## Troubleshooting
+## 🛠️ Troubleshooting
+
+### Common Issues
 
 | Issue | Solution |
 |-------|----------|
-| "Recording..." but nothing happens | Check Microphone permission for Hammerspoon |
-| Transcription doesn't paste | Check Accessibility permission for Hammerspoon |
+| "Recording..." but nothing happens | Grant Microphone permission for Hammerspoon |
+| Transcription doesn't paste | Grant Accessibility permission for Hammerspoon |
 | Hotkey doesn't trigger | Hammerspoon menu → Reload Config |
-| Zombie sox processes | Run `pkill -9 sox` |
+| Zombie sox processes | `pkill -9 sox` |
 
-### Debug install issues
+### Debug Install
 
 ```bash
 bash -x /tmp/install.sh 2>&1 | tee /tmp/install.log
 ```
 
-### Verify installation
+### Verify Installation
 
 ```bash
 command -v whisper-cli && echo "✓ whisper-cli" || echo "✗ whisper-cli"
@@ -171,17 +208,47 @@ ls /Applications/Hammerspoon.app && echo "✓ Hammerspoon" || echo "✗ Hammersp
 ls ~/Library/Application\ Support/whisper.cpp/*.bin && echo "✓ Models" || echo "✗ Models"
 ```
 
-## Feedback & Ideas
+---
 
-Have ideas for new features? [Open an issue](https://github.com/sparrowfm/voice-ptt/issues) or start a discussion.
+## 🗑️ Uninstall
 
-Some things we're considering:
-- Audio feedback (beep) instead of visual alerts
-- Copy-only mode (don't auto-paste)
-- Transcription history log
-- Multi-language support
+```bash
+curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/uninstall.sh | bash
+```
 
-## Credits
+To fully remove all components:
+```bash
+brew uninstall whisper-cpp sox
+brew uninstall --cask hammerspoon
+```
+
+---
+
+## 🎨 How It Works
+
+```
+Hotkey pressed → sox records audio → Hotkey released → whisper-cli transcribes → cleanup → paste
+```
+
+All processing happens locally using Metal GPU acceleration. **No data leaves your Mac. Ever.**
+
+---
+
+## 💡 Future Ideas
+
+Want to help shape the roadmap? [Open an issue](https://github.com/sparrowfm/voice-ptt/issues) or start a discussion.
+
+**Considering:**
+- 🔔 Audio feedback (beep) instead of visual alerts
+- 📋 Copy-only mode (don't auto-paste)
+- 📜 Transcription history log
+- 🌍 Multi-language support
+- 🎯 Custom vocabulary injection
+- ⌨️ Text macro expansion
+
+---
+
+## 🙏 Credits
 
 This project stands on the shoulders of giants:
 
@@ -193,6 +260,15 @@ This project stands on the shoulders of giants:
 
 - **[OpenAI Whisper](https://github.com/openai/whisper)** - The original speech recognition model that made all of this possible. OpenAI's decision to open-source Whisper enabled the entire ecosystem of local, private transcription tools.
 
-## License
+---
+
+## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">
+  <strong>Built with ❤️ for privacy-conscious Mac users</strong><br>
+  <sub>No telemetry. No tracking. No cloud. Just you and your voice.</sub>
+</p>
