@@ -3,6 +3,8 @@
 # Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install-voice.sh
 
+VERSION="1.1.0"  # Update this when making changes
+
 echo "═══════════════════════════════════════════════════════════════"
 echo "  Push-to-Talk Voice Transcription Installer"
 echo "  100% Local • No Cloud • Whisper AI on Apple Silicon"
@@ -293,6 +295,62 @@ hs.hotkey.bind(mods, key,
   end
 )
 
+-- Auto-update checker (runs every 7 days)
+local function checkForUpdates()
+  local versionFile = os.getenv("HOME") .. "/.config/voice-ptt/version"
+  local lastCheckFile = os.getenv("HOME") .. "/.config/voice-ptt/last-check"
+
+  -- Check if it's time to check for updates (every 7 days)
+  local shouldCheck = false
+  local lastCheckF = io.open(lastCheckFile, "r")
+  if lastCheckF then
+    local lastCheck = tonumber(lastCheckF:read("*all"))
+    lastCheckF:close()
+    local daysSinceCheck = (os.time() - lastCheck) / 86400
+    shouldCheck = daysSinceCheck >= 7
+  else
+    shouldCheck = true  -- First run
+  end
+
+  if not shouldCheck then
+    return
+  end
+
+  -- Update last check time
+  local f = io.open(lastCheckFile, "w")
+  if f then
+    f:write(tostring(os.time()))
+    f:close()
+  end
+
+  -- Read local version
+  local localVersion = "unknown"
+  local vf = io.open(versionFile, "r")
+  if vf then
+    localVersion = vf:read("*all"):gsub("\n", "")
+    vf:close()
+  end
+
+  -- Check GitHub for latest version
+  local output, status = hs.execute("curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/install.sh 2>/dev/null | grep '^VERSION=' | head -1 | cut -d'\"' -f2")
+
+  if status and output then
+    local remoteVersion = output:gsub("\n", "")
+    if remoteVersion ~= "" and remoteVersion ~= localVersion then
+      -- Show notification about available update
+      hs.notify.new({
+        title = "voice-ptt update available",
+        informativeText = "Version " .. remoteVersion .. " is available (you have " .. localVersion .. ")\n\nRun: voice-ptt-update",
+        hasActionButton = false,
+        withdrawAfter = 0  -- Don't auto-dismiss
+      }):send()
+    end
+  end
+end
+
+-- Check for updates 30 seconds after launch, then every 7 days
+hs.timer.doAfter(30, checkForUpdates)
+
 hs.alert.show("Voice transcription ready ($HOTKEY_DISPLAY)")
 LUAEOF
     echo "✓ Hammerspoon config created"
@@ -555,6 +613,10 @@ echo "✓ Done"
 UPDATEEOF
 chmod +x "$HOME/bin/voice-ptt-update"
 echo "✓ Update command installed"
+
+# Store version for update checking
+mkdir -p "$HOME/.config/voice-ptt"
+echo "$VERSION" > "$HOME/.config/voice-ptt/version"
 
 # Add ~/bin to PATH in .zshrc if not already there
 if ! grep -q 'export PATH="$HOME/bin:$PATH"' "$HOME/.zshrc" 2>/dev/null; then

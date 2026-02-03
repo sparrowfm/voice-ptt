@@ -27,13 +27,16 @@ Then grant Hammerspoon **Accessibility** and **Microphone** permissions in Syste
 
 Hold **your hotkey** → speak → release → text appears at cursor
 
-## Update to Latest Version
+## Updates
 
+**Automatic checking**: voice-ptt checks GitHub for updates every 7 days and shows a notification when a new version is available.
+
+**Manual update**:
 ```bash
 voice-ptt-update
 ```
 
-Checks for updates and applies them automatically while preserving your hotkey settings.
+Downloads and applies the latest version while preserving your hotkey settings.
 
 ## Change Hotkey
 
