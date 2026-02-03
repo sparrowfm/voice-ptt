@@ -3,7 +3,7 @@
 # Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install.sh
 
-VERSION="1.4.1"  # Update this when making changes
+VERSION="1.4.2"  # Update this when making changes
 
 # Configuration constants
 readonly WHISPER_MODEL_DIR="$HOME/Library/Application Support/whisper.cpp"
@@ -902,9 +902,10 @@ show_status() {
 
   if [[ -f "$CLEANUP_FILE" ]]; then
     echo "Advanced cleanup: ENABLED"
-    if command -v ollama &> /dev/null; then
-      echo "  - Ollama: $(command -v ollama)"
-      if ollama list 2>/dev/null | grep -q "llama3.2:1b"; then
+    local ollama_path=""
+    if ollama_path=$(find_ollama); then
+      echo "  - Ollama: $ollama_path"
+      if "$ollama_path" list 2>/dev/null | grep -q "llama3.2:1b"; then
         echo "  - Model: llama3.2:1b (ready)"
       else
         echo "  - Model: llama3.2:1b (not downloaded)"
@@ -918,31 +919,62 @@ show_status() {
   fi
 }
 
+find_ollama() {
+  # Check PATH first
+  if command -v ollama &> /dev/null; then
+    command -v ollama
+    return 0
+  fi
+
+  # Check common install locations
+  local locations=(
+    "/opt/homebrew/bin/ollama"
+    "/usr/local/bin/ollama"
+    "$HOME/.ollama/ollama"
+    "/Applications/Ollama.app/Contents/Resources/ollama"
+  )
+
+  for path in "${locations[@]}"; do
+    if [[ -x "$path" ]]; then
+      echo "$path"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 enable_advanced() {
   echo "==================================================================="
   echo "  Enable Advanced Cleanup"
   echo "==================================================================="
   echo ""
 
-  # Check for Ollama
-  if ! command -v ollama &> /dev/null; then
+  # Check for Ollama in PATH and common locations
+  OLLAMA_PATH=""
+  if OLLAMA_PATH=$(find_ollama); then
+    echo "✓ Ollama found: $OLLAMA_PATH"
+  else
     echo "❌ Ollama not found."
     echo ""
     echo "Install Ollama first:"
     echo "  brew install ollama"
     echo "  OR visit https://ollama.ai"
+    echo ""
+    echo "After installing, either:"
+    echo "  1. Restart your terminal"
+    echo "  2. Or run: source ~/.zshrc"
     exit 1
   fi
 
-  echo "✓ Ollama found: $(command -v ollama)"
   echo ""
 
   # Check if model exists
-  if ! ollama list 2>/dev/null | grep -q "llama3.2:1b"; then
+  if ! "$OLLAMA_PATH" list 2>/dev/null | grep -q "llama3.2:1b"; then
     echo "Downloading llama3.2:1b model (~1.3GB, one-time)..."
     echo "This may take a few minutes..."
     echo ""
-    if ! ollama pull llama3.2:1b; then
+    if ! "$OLLAMA_PATH" pull llama3.2:1b; then
       echo "❌ Failed to download model"
       exit 1
     fi
