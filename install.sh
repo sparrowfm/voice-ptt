@@ -3,7 +3,7 @@
 # Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install.sh
 
-VERSION="1.4.2"  # Update this when making changes
+VERSION="1.4.3"  # Update this when making changes
 
 # Configuration constants
 readonly WHISPER_MODEL_DIR="$HOME/Library/Application Support/whisper.cpp"
@@ -254,10 +254,24 @@ function configure_advanced_cleanup() {
     fi
 
     ENABLE_ADVANCED_CLEANUP=true
+
+    # Start Ollama service if not running
+    if ! pgrep -x "ollama" > /dev/null; then
+        echo "Starting Ollama service..."
+        ollama serve > /dev/null 2>&1 &
+        sleep 2  # Give it time to start
+        echo "✓ Ollama service started"
+    fi
+
     echo "Downloading llama3.2:1b model (~1.3GB)..."
     echo "This may take a few minutes..."
     if ! ollama pull llama3.2:1b; then
         echo "❌ Model download failed, advanced cleanup will be disabled"
+        echo ""
+        echo "Troubleshooting:"
+        echo "  1. Check if Ollama service is running: pgrep ollama"
+        echo "  2. Try manually: ollama serve (in another terminal)"
+        echo "  3. Then run: voice-ptt-cleanup enable"
         ENABLE_ADVANCED_CLEANUP=false
     else
         echo "✓ Model downloaded successfully"
@@ -969,6 +983,15 @@ enable_advanced() {
 
   echo ""
 
+  # Start Ollama service if not running
+  if ! pgrep -x "ollama" > /dev/null; then
+    echo "Starting Ollama service..."
+    "$OLLAMA_PATH" serve > /dev/null 2>&1 &
+    sleep 2  # Give it time to start
+    echo "✓ Ollama service started"
+    echo ""
+  fi
+
   # Check if model exists
   if ! "$OLLAMA_PATH" list 2>/dev/null | grep -q "llama3.2:1b"; then
     echo "Downloading llama3.2:1b model (~1.3GB, one-time)..."
@@ -976,6 +999,11 @@ enable_advanced() {
     echo ""
     if ! "$OLLAMA_PATH" pull llama3.2:1b; then
       echo "❌ Failed to download model"
+      echo ""
+      echo "Troubleshooting:"
+      echo "  1. Check if Ollama service is running: pgrep ollama"
+      echo "  2. Try manually: ollama serve (in another terminal)"
+      echo "  3. Then run: voice-ptt-cleanup enable"
       exit 1
     fi
   else
