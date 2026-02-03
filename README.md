@@ -27,6 +27,14 @@ Then grant Hammerspoon **Accessibility** and **Microphone** permissions in Syste
 
 Hold **your hotkey** → speak → release → text appears at cursor
 
+## Update to Latest Version
+
+```bash
+voice-ptt-update
+```
+
+Checks for updates and applies them automatically while preserving your hotkey settings.
+
 ## Change Hotkey
 
 After installation, run:

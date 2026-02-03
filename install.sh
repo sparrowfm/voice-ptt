@@ -268,7 +268,9 @@ hs.hotkey.bind(mods, key,
           if f then
             local text = f:read("*all")
             f:close()
-            text = text:gsub("^%s+", ""):gsub("%s+$", "")
+            -- Remove internal newlines (whisper adds these during segmentation)
+            -- then trim leading/trailing whitespace
+            text = text:gsub("\n", " "):gsub("^%s+", ""):gsub("%s+$", "")
             if text and text ~= "" then
               hs.pasteboard.setContents(text)
               hs.eventtap.keyStroke({"cmd"}, "v")
@@ -467,6 +469,92 @@ echo "✓ Hammerspoon config reloaded"
 MODELEOF
 chmod +x "$HOME/bin/voice-ptt-model"
 echo "✓ Model command installed"
+
+# Create update script
+cat > "$HOME/bin/voice-ptt-update" << 'UPDATEEOF'
+#!/bin/bash
+# voice-ptt-update - Update voice-ptt to the latest version
+
+REPO_URL="https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/install.sh"
+CONFIG_FILE="$HOME/.hammerspoon/init.lua"
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "  Voice-PTT Update Checker"
+echo "═══════════════════════════════════════════════════════════════"
+echo
+
+# Check if voice-ptt is installed
+if [[ ! -f "$CONFIG_FILE" ]] || ! grep -q "Push-to-Talk Whisper" "$CONFIG_FILE" 2>/dev/null; then
+    echo "❌ voice-ptt not installed. Run the installer first:"
+    echo "   curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/install.sh -o /tmp/install.sh && bash /tmp/install.sh"
+    exit 1
+fi
+
+echo "Checking for updates..."
+
+# Save current hotkey configuration
+CURRENT_MODS=$(grep "^local mods = " "$CONFIG_FILE" | head -1 | sed 's/.*= //')
+CURRENT_KEY=$(grep "^local key = " "$CONFIG_FILE" | head -1 | sed 's/.*= //')
+
+echo "✓ Current installation found"
+echo "  Hotkey: $CURRENT_MODS + $CURRENT_KEY"
+echo
+
+# Download latest installer
+TMP_INSTALLER="/tmp/voice-ptt-update-$$.sh"
+if ! curl -fsSL "$REPO_URL" -o "$TMP_INSTALLER"; then
+    echo "❌ Failed to download latest version"
+    exit 1
+fi
+
+echo "✓ Downloaded latest version"
+echo
+
+# Backup current config
+BACKUP_FILE="$HOME/.hammerspoon/init.lua.backup.$(date +%Y%m%d%H%M%S)"
+if [[ -f "$CONFIG_FILE" ]]; then
+    cp "$CONFIG_FILE" "$BACKUP_FILE"
+    echo "✓ Backed up config to $(basename "$BACKUP_FILE")"
+    echo
+fi
+
+echo "─────────────────────────────────────────────────────────────────"
+read -p "Apply update? [y/N] " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Update cancelled"
+    rm -f "$TMP_INSTALLER"
+    exit 0
+fi
+
+echo
+echo "Applying update..."
+echo "─────────────────────────────────────────────────────────────────"
+
+# Run installer in non-interactive mode
+bash "$TMP_INSTALLER" < /dev/null
+
+# Restore hotkey settings
+if [[ -f "$CONFIG_FILE" ]]; then
+    sed -i '' "s/^local mods = .*/local mods = $CURRENT_MODS/" "$CONFIG_FILE" 2>/dev/null
+    sed -i '' "s/^local key = .*/local key = $CURRENT_KEY/" "$CONFIG_FILE" 2>/dev/null
+fi
+
+rm -f "$TMP_INSTALLER"
+
+echo
+echo "═══════════════════════════════════════════════════════════════"
+echo "  Update complete!"
+echo "═══════════════════════════════════════════════════════════════"
+echo
+echo "Your hotkey settings have been preserved: $CURRENT_MODS + $CURRENT_KEY"
+echo
+echo "Reloading Hammerspoon..."
+open -g hammerspoon://reload
+echo "✓ Done"
+UPDATEEOF
+chmod +x "$HOME/bin/voice-ptt-update"
+echo "✓ Update command installed"
 
 # Add ~/bin to PATH in .zshrc if not already there
 if ! grep -q 'export PATH="$HOME/bin:$PATH"' "$HOME/.zshrc" 2>/dev/null; then
