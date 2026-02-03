@@ -3,7 +3,7 @@
 # Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install-voice.sh
 
-VERSION="1.2.0"  # Update this when making changes
+VERSION="1.3.0"  # Update this when making changes
 
 echo "═══════════════════════════════════════════════════════════════"
 echo "  Push-to-Talk Voice Transcription Installer"
@@ -179,6 +179,54 @@ echo ""
 echo "ℹ️  Using base model (fast, ~1-3s transcription)"
 echo "   For better accuracy, run: voice-ptt-model"
 echo "   (Downloads 1.5GB medium model on demand)"
+
+echo
+
+# Optional: Advanced cleanup
+echo "─────────────────────────────────────────────────────────────────"
+echo "Text Cleanup Options"
+echo "─────────────────────────────────────────────────────────────────"
+echo ""
+echo "Basic cleanup (always enabled):"
+echo "  • Removes filler words: um, uh, like, you know"
+echo "  • Instant, no performance impact"
+echo ""
+echo "Advanced cleanup (optional):"
+echo "  • LLM-based intelligent cleanup"
+echo "  • Better punctuation and context awareness"
+echo "  • Requires Ollama + llama3.2:1b (~1.3GB)"
+echo "  • Adds ~1-2s to transcription time"
+echo ""
+
+ENABLE_ADVANCED_CLEANUP=false
+
+# Check if running interactively
+if [[ -t 0 ]]; then
+    # Check if Ollama is available
+    if command -v ollama &> /dev/null; then
+        echo "✓ Ollama detected: $(command -v ollama)"
+        read -p "Enable advanced cleanup? [Y/n] " -n 1 -r cleanup_choice
+        echo ""
+        if [[ ! $cleanup_choice =~ ^[Nn]$ ]]; then
+            ENABLE_ADVANCED_CLEANUP=true
+            echo "Downloading llama3.2:1b model (~1.3GB)..."
+            echo "This may take a few minutes..."
+            if ollama pull llama3.2:1b; then
+                echo "✓ Model downloaded successfully"
+            else
+                echo "❌ Model download failed, advanced cleanup will be disabled"
+                ENABLE_ADVANCED_CLEANUP=false
+            fi
+        else
+            echo "Skipping advanced cleanup (can enable later with: voice-ptt-cleanup enable)"
+        fi
+    else
+        echo "Ollama not found. Skipping advanced cleanup."
+        echo "To enable later: brew install ollama && voice-ptt-cleanup enable"
+    fi
+else
+    echo "Running non-interactively, skipping advanced cleanup prompt"
+fi
 
 echo
 
@@ -820,6 +868,12 @@ echo "✓ Cleanup command installed"
 # Store version for update checking
 mkdir -p "$HOME/.config/voice-ptt"
 echo "$VERSION" > "$HOME/.config/voice-ptt/version"
+
+# Enable advanced cleanup if user opted in during install
+if [[ "$ENABLE_ADVANCED_CLEANUP" == "true" ]]; then
+    touch "$HOME/.config/voice-ptt/cleanup-enabled"
+    echo "✓ Advanced cleanup enabled"
+fi
 
 # Add ~/bin to PATH in .zshrc if not already there
 if ! grep -q 'export PATH="$HOME/bin:$PATH"' "$HOME/.zshrc" 2>/dev/null; then
