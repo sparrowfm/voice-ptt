@@ -3,7 +3,7 @@
 # Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install.sh
 
-VERSION="1.4.5"  # Update this when making changes
+VERSION="1.4.6"  # Update this when making changes
 
 # Configuration constants
 readonly WHISPER_MODEL_DIR="$HOME/Library/Application Support/whisper.cpp"
@@ -853,28 +853,75 @@ fi
 if [[ "$CLEANUP_WAS_ENABLED" == "true" ]]; then
     touch "$CLEANUP_FILE"
     echo "✓ Advanced cleanup setting restored"
-# If they didn't have it before, offer to enable it now
-elif command -v ollama &> /dev/null && [[ -t 0 ]]; then
-    # Check if this is the real Ollama or just the Homebrew wrapper
-    OLLAMA_REAL=false
-    if [[ -d "/Applications/Ollama.app" ]] || ollama list &> /dev/null; then
-        OLLAMA_REAL=true
+# If they didn't have it before, offer to install and enable it now
+elif [[ -t 0 ]]; then
+    # Check if Ollama is installed (real app, not just wrapper)
+    OLLAMA_INSTALLED=false
+    OLLAMA_WRAPPER_ONLY=false
+
+    if [[ -d "/Applications/Ollama.app" ]] || ollama list &> /dev/null 2>&1; then
+        OLLAMA_INSTALLED=true
+    elif command -v ollama &> /dev/null; then
+        OLLAMA_WRAPPER_ONLY=true
     fi
 
-    if [[ "$OLLAMA_REAL" == "false" ]]; then
+    if [[ "$OLLAMA_INSTALLED" == "false" ]]; then
         echo
         echo "─────────────────────────────────────────────────────────────────"
-        echo "⚠️  Ollama CLI detected, but Ollama.app not installed"
+        echo "⭐ NEW: Advanced Cleanup Feature"
         echo "─────────────────────────────────────────────────────────────────"
         echo ""
-        echo "The 'ollama' command is available, but the actual Ollama application"
-        echo "is not installed. The Homebrew ollama package is just a CLI wrapper."
+        echo "voice-ptt can use Ollama (local LLM) for smarter text cleanup:"
+        echo "  • Better punctuation and context awareness"
+        echo "  • Uses dictionary entries intelligently"
+        echo "  • 100% local, ~1-2s additional processing"
         echo ""
-        echo "To enable advanced cleanup, install Ollama.app:"
-        echo "  brew install --cask ollama"
-        echo "  OR download from: https://ollama.ai"
+
+        if [[ "$OLLAMA_WRAPPER_ONLY" == "true" ]]; then
+            echo "⚠️  Ollama CLI wrapper detected, but Ollama.app not installed."
+            echo "   The Homebrew 'ollama' package is just a wrapper."
+            echo ""
+        fi
+
+        read -p "Install Ollama and enable advanced cleanup? [Y/N] " -n 1 -r install_choice
         echo ""
-        echo "Then run: voice-ptt-cleanup enable"
+
+        if [[ $install_choice =~ ^[Yy]$ ]]; then
+            echo "Installing Ollama.app..."
+            if brew install --cask ollama; then
+                echo "✓ Ollama.app installed"
+                echo ""
+
+                # Wait a moment for app to be ready
+                sleep 2
+
+                # Now enable advanced cleanup
+                echo "Enabling advanced cleanup..."
+
+                # Start service
+                if ! pgrep -x "ollama" > /dev/null; then
+                    echo "Starting Ollama service..."
+                    /Applications/Ollama.app/Contents/Resources/ollama serve > /dev/null 2>&1 &
+                    sleep 3
+                fi
+
+                # Download model
+                echo "Downloading llama3.2:1b model (~1.3GB)..."
+                if /Applications/Ollama.app/Contents/Resources/ollama pull llama3.2:1b; then
+                    touch "$CLEANUP_FILE"
+                    echo "✓ Advanced cleanup enabled"
+                else
+                    echo "❌ Model download failed. Try later: voice-ptt-cleanup enable"
+                fi
+            else
+                echo "❌ Ollama installation failed"
+                echo "   Install manually: brew install --cask ollama"
+                echo "   Then run: voice-ptt-cleanup enable"
+            fi
+        else
+            echo "Skipped (install later with: brew install --cask ollama)"
+            echo "Then enable with: voice-ptt-cleanup enable"
+        fi
         echo ""
     else
         echo
