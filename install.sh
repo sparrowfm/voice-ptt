@@ -223,6 +223,11 @@ cat > "$CONFIG_FILE" << LUAEOF
 -- Hold hotkey to record, release to transcribe and paste
 -- 100% local - no cloud, no data leaves your Mac
 
+-- Hide console window on startup
+if hs.console.hswindow() then
+  hs.console.hswindow():close()
+end
+
 local whisper = "/opt/homebrew/bin/whisper-cli"
 local sox = "/opt/homebrew/bin/sox"
 
