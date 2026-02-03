@@ -3,7 +3,7 @@
 # Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install.sh
 
-VERSION="1.4.0"  # Update this when making changes
+VERSION="1.4.1"  # Update this when making changes
 
 # Configuration constants
 readonly WHISPER_MODEL_DIR="$HOME/Library/Application Support/whisper.cpp"
@@ -817,6 +817,15 @@ echo
 echo "Applying update..."
 echo "─────────────────────────────────────────────────────────────────"
 
+# Check if advanced cleanup was previously enabled
+CLEANUP_WAS_ENABLED=false
+CLEANUP_FILE="$HOME/.config/voice-ptt/cleanup-enabled"
+if [[ -f "$CLEANUP_FILE" ]]; then
+    CLEANUP_WAS_ENABLED=true
+    echo "✓ Advanced cleanup was enabled, will preserve setting"
+    echo
+fi
+
 # Run installer in non-interactive mode
 bash "$TMP_INSTALLER" < /dev/null
 
@@ -824,6 +833,37 @@ bash "$TMP_INSTALLER" < /dev/null
 if [[ -f "$CONFIG_FILE" ]]; then
     sed -i '' "s/^local mods = .*/local mods = $CURRENT_MODS/" "$CONFIG_FILE" 2>/dev/null
     sed -i '' "s/^local key = .*/local key = $CURRENT_KEY/" "$CONFIG_FILE" 2>/dev/null
+fi
+
+# Restore advanced cleanup setting
+if [[ "$CLEANUP_WAS_ENABLED" == "true" ]]; then
+    touch "$CLEANUP_FILE"
+    echo "✓ Advanced cleanup setting restored"
+# If they didn't have it before, offer to enable it now
+elif command -v ollama &> /dev/null && [[ -t 0 ]]; then
+    echo
+    echo "─────────────────────────────────────────────────────────────────"
+    echo "⭐ NEW: Advanced Cleanup Feature"
+    echo "─────────────────────────────────────────────────────────────────"
+    echo ""
+    echo "Ollama detected on this system. Enable advanced LLM cleanup?"
+    echo "  • Better punctuation and context awareness"
+    echo "  • Uses dictionary entries intelligently"
+    echo "  • Adds ~1-2s to transcription time"
+    echo ""
+    read -p "Enable now? [Y/N] " -n 1 -r enable_choice
+    echo ""
+    if [[ $enable_choice =~ ^[Yy]$ ]]; then
+        echo "Downloading llama3.2:1b model (~1.3GB)..."
+        if ollama pull llama3.2:1b; then
+            touch "$CLEANUP_FILE"
+            echo "✓ Advanced cleanup enabled"
+        else
+            echo "❌ Model download failed, you can try later with: voice-ptt-cleanup enable"
+        fi
+    else
+        echo "Skipped (enable later with: voice-ptt-cleanup enable)"
+    fi
 fi
 
 rm -f "$TMP_INSTALLER"
