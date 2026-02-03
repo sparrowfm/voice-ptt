@@ -169,6 +169,42 @@ voice-ptt-cleanup status    # Check current status
 
 ---
 
+### Custom Dictionary
+
+Teach voice-ptt your preferred terminology and abbreviations:
+
+```bash
+voice-ptt-dictionary          # Open dictionary in editor
+voice-ptt-dictionary add "kubernetes" "Kubernetes"
+voice-ptt-dictionary list     # Show all entries
+```
+
+**Dictionary format** (`~/.config/voice-ptt/dictionary.txt`):
+```
+# Case-sensitive replacements
+kubernetes -> Kubernetes
+api -> API
+BTW -> by the way
+
+# Case-insensitive (use (?i) prefix)
+(?i)anthropic -> Anthropic
+(?i)claude -> Claude
+
+# Comments start with #
+```
+
+**How it works:**
+- **Basic tier (always on)**: Instant find/replace after transcription
+- **Advanced tier (if enabled)**: LLM uses dictionary as context for intelligent replacements
+
+**Use cases:**
+- Technical terms Whisper gets wrong
+- Proper nouns (names, companies)
+- Common abbreviations you use
+- Domain-specific jargon
+
+---
+
 ## 🔧 Commands
 
 After installation, these commands are available:
@@ -179,6 +215,7 @@ After installation, these commands are available:
 | `voice-ptt-hotkey` | Change hotkey binding |
 | `voice-ptt-model` | Switch between base/medium models |
 | `voice-ptt-cleanup` | Enable/disable/check advanced cleanup |
+| `voice-ptt-dictionary` | Manage custom text replacements |
 
 ---
 
@@ -243,8 +280,8 @@ Want to help shape the roadmap? [Open an issue](https://github.com/sparrowfm/voi
 - 📋 Copy-only mode (don't auto-paste)
 - 📜 Transcription history log
 - 🌍 Multi-language support
-- 🎯 Custom vocabulary injection
 - ⌨️ Text macro expansion
+- 🎙️ Voice commands (pause/resume transcription)
 
 ---
 
@@ -259,6 +296,8 @@ This project stands on the shoulders of giants:
 - **[SoX](http://sox.sourceforge.net/)** - The "Swiss Army knife of audio" has been faithfully processing audio on Unix systems since 1991. Simple, reliable, does exactly what it needs to do.
 
 - **[OpenAI Whisper](https://github.com/openai/whisper)** - The original speech recognition model that made all of this possible. OpenAI's decision to open-source Whisper enabled the entire ecosystem of local, private transcription tools.
+
+- **[Ollama](https://ollama.ai)** - The easiest way to run large language models locally. Powers the optional advanced cleanup feature, bringing intelligent text refinement to voice transcription while maintaining complete privacy. Makes running local LLMs as simple as `brew install ollama`.
 
 ---
 

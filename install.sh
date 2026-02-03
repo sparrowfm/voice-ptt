@@ -3,7 +3,7 @@
 # Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install.sh
 
-VERSION="1.3.0"  # Update this when making changes
+VERSION="1.4.0"  # Update this when making changes
 
 # Configuration constants
 readonly WHISPER_MODEL_DIR="$HOME/Library/Application Support/whisper.cpp"
@@ -381,6 +381,9 @@ hs.hotkey.bind(mods, key,
               -- Apply basic cleanup (always enabled)
               text = basicCleanup(text)
 
+              -- Apply custom dictionary (always enabled, fast)
+              text = applyDictionary(text)
+
               -- Apply advanced LLM cleanup if enabled
               if advancedCleanupEnabled and ollamaPath then
                 local cleaned = advancedCleanup(text, ollamaPath)
@@ -409,6 +412,73 @@ hs.hotkey.bind(mods, key,
     whisperTask:start()
   end
 )
+
+-- Custom dictionary for text replacements
+local dictionaryEntries = {}
+
+local function loadDictionary()
+  local dictFile = os.getenv("HOME") .. "/.config/voice-ptt/dictionary.txt"
+  local f = io.open(dictFile, "r")
+  if not f then
+    return
+  end
+
+  dictionaryEntries = {}
+  for line in f:lines() do
+    -- Skip empty lines and comments
+    if line:match("%S") and not line:match("^%s*#") then
+      -- Parse format: FIND -> REPLACE or FIND|REPLACE
+      local find, replace = line:match("^%s*(.-)%s*%->%s*(.-)%s*$")
+      if not find then
+        find, replace = line:match("^%s*(.-)%s*|%s*(.-)%s*$")
+      end
+
+      if find and replace then
+        -- Check for case-insensitive marker (?i)
+        local caseInsensitive = false
+        if find:match("^%(%?i%)") then
+          caseInsensitive = true
+          find = find:gsub("^%(%?i%)", "")
+        end
+
+        table.insert(dictionaryEntries, {
+          find = find,
+          replace = replace,
+          caseInsensitive = caseInsensitive
+        })
+      end
+    end
+  end
+  f:close()
+end
+
+local function applyDictionary(text)
+  if #dictionaryEntries == 0 then
+    return text
+  end
+
+  for _, entry in ipairs(dictionaryEntries) do
+    if entry.caseInsensitive then
+      -- Case-insensitive replacement
+      local pattern = entry.find:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
+      text = text:gsub("(" .. pattern .. ")", function(match)
+        -- Preserve original case of first letter if replacing single word
+        if entry.replace:match("^%u") and match:match("^%l") then
+          return entry.replace:gsub("^%u", string.lower)
+        end
+        return entry.replace
+      end)
+    else
+      -- Case-sensitive replacement (simple)
+      text = text:gsub(entry.find, entry.replace)
+    end
+  end
+
+  return text
+end
+
+-- Load dictionary on startup
+loadDictionary()
 
 -- Text cleanup functions
 local function basicCleanup(text)
@@ -455,7 +525,17 @@ end
 
 local function advancedCleanup(text, ollamaPath)
   -- LLM-based cleanup (requires Ollama)
-  local prompt = "Remove filler words (um, uh, like, you know) and fix punctuation. Keep meaning and style. Output only the cleaned text:\n\n" .. text
+  local prompt = "Remove filler words (um, uh, like, you know) and fix punctuation. Keep meaning and style."
+
+  -- Add dictionary context if entries exist
+  if #dictionaryEntries > 0 then
+    prompt = prompt .. " Apply these preferred terms:"
+    for _, entry in ipairs(dictionaryEntries) do
+      prompt = prompt .. "\\n- Use '" .. entry.replace .. "' for '" .. entry.find .. "'"
+    end
+  end
+
+  prompt = prompt .. "\\n\\nOutput only the cleaned text:\\n\\n" .. text
 
   -- Escape single quotes for shell
   prompt = prompt:gsub("'", "'\\\\''")
@@ -557,6 +637,7 @@ function create_utility_commands() {
     create_model_command
     create_update_command
     create_cleanup_command
+    create_dictionary_command
 
     echo "✓ Utility commands installed"
 }
@@ -872,6 +953,190 @@ case "${1:-status}" in
 esac
 CLEANUPEOF
     chmod +x "$BIN_DIR/voice-ptt-cleanup"
+}
+
+function create_dictionary_command() {
+    cat > "$BIN_DIR/voice-ptt-dictionary" << 'DICTEOF'
+#!/bin/bash
+# voice-ptt-dictionary - Manage custom text replacements
+
+DICT_FILE="$HOME/.config/voice-ptt/dictionary.txt"
+
+show_help() {
+  echo "voice-ptt-dictionary - Manage custom text replacements"
+  echo ""
+  echo "Usage:"
+  echo "  voice-ptt-dictionary                 # Open dictionary in \$EDITOR"
+  echo "  voice-ptt-dictionary list            # Show current entries"
+  echo "  voice-ptt-dictionary add FIND REPLACE"
+  echo "  voice-ptt-dictionary clear           # Clear all entries"
+  echo "  voice-ptt-dictionary help            # Show this help"
+  echo ""
+  echo "Dictionary Format:"
+  echo "  FIND -> REPLACE          # Case-sensitive"
+  echo "  (?i)FIND -> REPLACE      # Case-insensitive"
+  echo "  # Comments start with #"
+  echo ""
+  echo "Examples:"
+  echo "  kubernetes -> Kubernetes"
+  echo "  BTW -> by the way"
+  echo "  (?i)anthropic -> Anthropic"
+}
+
+list_entries() {
+  if [[ ! -f "$DICT_FILE" ]]; then
+    echo "No dictionary entries yet."
+    echo ""
+    echo "Add entries with:"
+    echo "  voice-ptt-dictionary add FIND REPLACE"
+    echo "Or edit directly:"
+    echo "  voice-ptt-dictionary"
+    return
+  fi
+
+  echo "═══════════════════════════════════════════════════════════════"
+  echo "  Custom Dictionary Entries"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+
+  local count=0
+  while IFS= read -r line; do
+    # Skip empty lines and comments
+    if [[ "$line" =~ ^[[:space:]]*$ ]] || [[ "$line" =~ ^[[:space:]]*# ]]; then
+      continue
+    fi
+    ((count++))
+    echo "$count. $line"
+  done < "$DICT_FILE"
+
+  if [[ $count -eq 0 ]]; then
+    echo "No active entries (only comments)."
+  fi
+  echo ""
+  echo "Total: $count entries"
+}
+
+add_entry() {
+  local find="$1"
+  local replace="$2"
+
+  if [[ -z "$find" ]] || [[ -z "$replace" ]]; then
+    echo "❌ Usage: voice-ptt-dictionary add FIND REPLACE"
+    exit 1
+  fi
+
+  # Create config dir if needed
+  mkdir -p "$(dirname "$DICT_FILE")"
+
+  # Create file with header if it doesn't exist
+  if [[ ! -f "$DICT_FILE" ]]; then
+    cat > "$DICT_FILE" << 'HEADER'
+# voice-ptt Custom Dictionary
+# Format: FIND -> REPLACE
+# Use (?i) prefix for case-insensitive matching
+# Examples:
+#   kubernetes -> Kubernetes
+#   BTW -> by the way
+#   (?i)anthropic -> Anthropic
+
+HEADER
+  fi
+
+  # Add entry
+  echo "$find -> $replace" >> "$DICT_FILE"
+  echo "✓ Added: $find -> $replace"
+  echo ""
+  echo "Reload Hammerspoon to apply changes"
+  open -g hammerspoon://reload
+}
+
+clear_entries() {
+  if [[ ! -f "$DICT_FILE" ]]; then
+    echo "Dictionary already empty."
+    return
+  fi
+
+  echo "═══════════════════════════════════════════════════════════════"
+  echo "  Clear Dictionary"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+  list_entries
+  echo ""
+  read -p "Delete all entries? [y/N] " -n 1 -r
+  echo ""
+
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Cancelled"
+    return
+  fi
+
+  rm -f "$DICT_FILE"
+  echo "✓ Dictionary cleared"
+  open -g hammerspoon://reload
+}
+
+edit_dictionary() {
+  # Create config dir if needed
+  mkdir -p "$(dirname "$DICT_FILE")"
+
+  # Create file with header if it doesn't exist
+  if [[ ! -f "$DICT_FILE" ]]; then
+    cat > "$DICT_FILE" << 'HEADER'
+# voice-ptt Custom Dictionary
+# Format: FIND -> REPLACE (or FIND|REPLACE)
+# Use (?i) prefix for case-insensitive matching
+#
+# Examples:
+#   kubernetes -> Kubernetes
+#   BTW -> by the way
+#   (?i)anthropic -> Anthropic
+#   (?i)hammerspoon -> Hammerspoon
+#
+# Technical terms:
+#   api -> API
+#   aws -> AWS
+#   llm -> LLM
+#
+# Your entries below:
+
+HEADER
+  fi
+
+  # Open in editor
+  ${EDITOR:-nano} "$DICT_FILE"
+
+  echo ""
+  echo "✓ Dictionary saved"
+  echo "Reloading Hammerspoon to apply changes..."
+  open -g hammerspoon://reload
+  echo "✓ Done"
+}
+
+case "${1:-edit}" in
+  list|ls)
+    list_entries
+    ;;
+  add)
+    add_entry "$2" "$3"
+    ;;
+  clear)
+    clear_entries
+    ;;
+  help|--help|-h)
+    show_help
+    ;;
+  edit|"")
+    edit_dictionary
+    ;;
+  *)
+    echo "❌ Unknown command: $1"
+    echo ""
+    show_help
+    exit 1
+    ;;
+esac
+DICTEOF
+    chmod +x "$BIN_DIR/voice-ptt-dictionary"
 }
 
 create_utility_commands
