@@ -3,7 +3,7 @@
 # Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install.sh
 
-VERSION="1.4.4"  # Update this when making changes
+VERSION="1.4.5"  # Update this when making changes
 
 # Configuration constants
 readonly WHISPER_MODEL_DIR="$HOME/Library/Application Support/whisper.cpp"
@@ -855,28 +855,58 @@ if [[ "$CLEANUP_WAS_ENABLED" == "true" ]]; then
     echo "✓ Advanced cleanup setting restored"
 # If they didn't have it before, offer to enable it now
 elif command -v ollama &> /dev/null && [[ -t 0 ]]; then
-    echo
-    echo "─────────────────────────────────────────────────────────────────"
-    echo "⭐ NEW: Advanced Cleanup Feature"
-    echo "─────────────────────────────────────────────────────────────────"
-    echo ""
-    echo "Ollama detected on this system. Enable advanced LLM cleanup?"
-    echo "  • Better punctuation and context awareness"
-    echo "  • Uses dictionary entries intelligently"
-    echo "  • Adds ~1-2s to transcription time"
-    echo ""
-    read -p "Enable now? [Y/N] " -n 1 -r enable_choice
-    echo ""
-    if [[ $enable_choice =~ ^[Yy]$ ]]; then
-        echo "Downloading llama3.2:1b model (~1.3GB)..."
-        if ollama pull llama3.2:1b; then
-            touch "$CLEANUP_FILE"
-            echo "✓ Advanced cleanup enabled"
-        else
-            echo "❌ Model download failed, you can try later with: voice-ptt-cleanup enable"
-        fi
+    # Check if this is the real Ollama or just the Homebrew wrapper
+    OLLAMA_REAL=false
+    if [[ -d "/Applications/Ollama.app" ]] || ollama list &> /dev/null; then
+        OLLAMA_REAL=true
+    fi
+
+    if [[ "$OLLAMA_REAL" == "false" ]]; then
+        echo
+        echo "─────────────────────────────────────────────────────────────────"
+        echo "⚠️  Ollama CLI detected, but Ollama.app not installed"
+        echo "─────────────────────────────────────────────────────────────────"
+        echo ""
+        echo "The 'ollama' command is available, but the actual Ollama application"
+        echo "is not installed. The Homebrew ollama package is just a CLI wrapper."
+        echo ""
+        echo "To enable advanced cleanup, install Ollama.app:"
+        echo "  brew install --cask ollama"
+        echo "  OR download from: https://ollama.ai"
+        echo ""
+        echo "Then run: voice-ptt-cleanup enable"
+        echo ""
     else
-        echo "Skipped (enable later with: voice-ptt-cleanup enable)"
+        echo
+        echo "─────────────────────────────────────────────────────────────────"
+        echo "⭐ NEW: Advanced Cleanup Feature"
+        echo "─────────────────────────────────────────────────────────────────"
+        echo ""
+        echo "Ollama detected on this system. Enable advanced LLM cleanup?"
+        echo "  • Better punctuation and context awareness"
+        echo "  • Uses dictionary entries intelligently"
+        echo "  • Adds ~1-2s to transcription time"
+        echo ""
+        read -p "Enable now? [Y/N] " -n 1 -r enable_choice
+        echo ""
+        if [[ $enable_choice =~ ^[Yy]$ ]]; then
+            # Start service if needed
+            if ! pgrep -x "ollama" > /dev/null; then
+                echo "Starting Ollama service..."
+                ollama serve > /dev/null 2>&1 &
+                sleep 3
+            fi
+
+            echo "Downloading llama3.2:1b model (~1.3GB)..."
+            if ollama pull llama3.2:1b; then
+                touch "$CLEANUP_FILE"
+                echo "✓ Advanced cleanup enabled"
+            else
+                echo "❌ Model download failed, you can try later with: voice-ptt-cleanup enable"
+            fi
+        else
+            echo "Skipped (enable later with: voice-ptt-cleanup enable)"
+        fi
     fi
 fi
 

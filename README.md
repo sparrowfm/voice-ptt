@@ -147,8 +147,9 @@ Then reload: **Hammerspoon menu → Reload Config**
 Enable LLM-based text refinement (requires Ollama):
 
 ```bash
-# Install Ollama (if not already installed)
-brew install ollama
+# Install Ollama.app (if not already installed)
+brew install --cask ollama
+# Note: Use --cask to install the actual app, not just the CLI wrapper
 
 # Enable advanced cleanup
 voice-ptt-cleanup enable
