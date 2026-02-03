@@ -3,7 +3,7 @@
 # Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install.sh
 
-VERSION="1.4.3"  # Update this when making changes
+VERSION="1.4.4"  # Update this when making changes
 
 # Configuration constants
 readonly WHISPER_MODEL_DIR="$HOME/Library/Application Support/whisper.cpp"
@@ -986,24 +986,53 @@ enable_advanced() {
   # Start Ollama service if not running
   if ! pgrep -x "ollama" > /dev/null; then
     echo "Starting Ollama service..."
-    "$OLLAMA_PATH" serve > /dev/null 2>&1 &
-    sleep 2  # Give it time to start
-    echo "✓ Ollama service started"
+    echo "Command: $OLLAMA_PATH serve"
+    "$OLLAMA_PATH" serve > /tmp/ollama-serve.log 2>&1 &
+    OLLAMA_PID=$!
+    sleep 3  # Give it more time to start
+
+    # Verify it started
+    if pgrep -x "ollama" > /dev/null; then
+      echo "✓ Ollama service started (PID: $(pgrep -x ollama))"
+    else
+      echo "⚠️  Ollama may not have started. Check: cat /tmp/ollama-serve.log"
+    fi
+    echo ""
+  else
+    echo "✓ Ollama service already running"
     echo ""
   fi
+
+  # Test connection
+  echo "Testing Ollama API connection..."
+  if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+    echo "✓ Can connect to Ollama API"
+  else
+    echo "❌ Cannot connect to Ollama API"
+    echo "Troubleshooting:"
+    echo "  1. Check service logs: cat /tmp/ollama-serve.log"
+    echo "  2. Try manually: $OLLAMA_PATH serve (in another terminal)"
+    echo "  3. Then run: voice-ptt-cleanup enable"
+    exit 1
+  fi
+  echo ""
 
   # Check if model exists
   if ! "$OLLAMA_PATH" list 2>/dev/null | grep -q "llama3.2:1b"; then
     echo "Downloading llama3.2:1b model (~1.3GB, one-time)..."
     echo "This may take a few minutes..."
     echo ""
-    if ! "$OLLAMA_PATH" pull llama3.2:1b; then
+    if ! "$OLLAMA_PATH" pull llama3.2:1b 2>&1 | tee /tmp/ollama-pull.log; then
+      echo ""
       echo "❌ Failed to download model"
       echo ""
-      echo "Troubleshooting:"
-      echo "  1. Check if Ollama service is running: pgrep ollama"
-      echo "  2. Try manually: ollama serve (in another terminal)"
-      echo "  3. Then run: voice-ptt-cleanup enable"
+      echo "Diagnostics:"
+      echo "  - Pull error log: cat /tmp/ollama-pull.log"
+      echo "  - Service log: cat /tmp/ollama-serve.log"
+      echo ""
+      echo "Try manually:"
+      echo "  1. $OLLAMA_PATH serve (in another terminal)"
+      echo "  2. voice-ptt-cleanup enable"
       exit 1
     fi
   else
