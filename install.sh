@@ -3,7 +3,7 @@
 # Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install.sh
 
-VERSION="1.4.7"  # Update this when making changes
+VERSION="1.4.8"  # Update this when making changes
 
 # Configuration constants
 readonly WHISPER_MODEL_DIR="$HOME/Library/Application Support/whisper.cpp"
@@ -289,53 +289,89 @@ function setup_hammerspoon_config() {
 
     mkdir -p "$HOME/.hammerspoon"
 
-    local write_config=false
+    local voice_ptt_file="$HOME/.hammerspoon/voice-ptt.lua"
+    local is_update=false
+    local saved_model=""
 
-    # Backup existing config if it exists and doesn't have our config
-    if [[ -f "$HAMMERSPOON_CONFIG" ]]; then
-        if grep -q "Push-to-Talk Whisper" "$HAMMERSPOON_CONFIG" 2>/dev/null; then
-            echo "✓ Push-to-talk config already present in init.lua"
-            echo "  (To change hotkey, run: voice-ptt-hotkey)"
-        else
-            local backup_file="$HOME/.hammerspoon/init.lua.backup.$(date +%Y%m%d%H%M%S)"
-            echo "Backing up existing init.lua to $(basename "$backup_file")"
-            cp "$HAMMERSPOON_CONFIG" "$backup_file"
-            echo "Creating new init.lua with push-to-talk config..."
-            write_config=true
+    # Check for existing voice-ptt module (update scenario)
+    if [[ -f "$voice_ptt_file" ]]; then
+        is_update=true
+        # Extract existing settings to preserve them
+        local existing_mods=$(grep "^local mods = " "$voice_ptt_file" | head -1 | sed 's/.*= //')
+        local existing_key=$(grep "^local key = " "$voice_ptt_file" | head -1 | sed 's/.*= //' | tr -d '"')
+        saved_model=$(grep "ggml-.*\.bin" "$voice_ptt_file" | head -1 | grep -o "ggml-[^\"]*\.bin")
+
+        if [[ -n "$existing_mods" ]]; then
+            HOTKEY_MODS="$existing_mods"
         fi
-    else
-        echo "Creating init.lua..."
-        write_config=true
+        if [[ -n "$existing_key" ]]; then
+            HOTKEY_KEY="$existing_key"
+        fi
+
+        echo "✓ Existing voice-ptt config detected - updating"
+        echo "  Hotkey: $HOTKEY_MODS + \"$HOTKEY_KEY\""
+        if [[ -n "$saved_model" ]]; then
+            echo "  Model: $saved_model"
+        fi
     fi
 
-    # Write config if needed (new install or backup was made)
-    if [[ "$write_config" == "true" ]]; then
-        # Set display name for alert
-        local hotkey_display
-        case "$HOTKEY_MODS" in
-            '{"alt"}') hotkey_display="Option+Space" ;;
-            '{"rightalt"}') hotkey_display="Right Option+Space" ;;
-            '{"ctrl"}') hotkey_display="Ctrl+Space" ;;
-            '{"cmd"}') hotkey_display="Cmd+Space" ;;
-            *) hotkey_display="$HOTKEY_KEY" ;;
-        esac
+    # Set display name for alert
+    local hotkey_display
+    case "$HOTKEY_MODS" in
+        '{"alt"}') hotkey_display="Option+Space" ;;
+        '{"rightalt"}') hotkey_display="Right Option+Space" ;;
+        '{"ctrl"}') hotkey_display="Ctrl+Space" ;;
+        '{"cmd"}') hotkey_display="Cmd+Space" ;;
+        *) hotkey_display="$HOTKEY_KEY" ;;
+    esac
 
-        write_hammerspoon_lua "$hotkey_display"
-        echo "✓ Hammerspoon config created"
+    # Write the voice-ptt module (always safe to overwrite - it's our file)
+    write_voice_ptt_module "$hotkey_display"
+
+    # Restore model setting if this was an update with non-default model
+    if [[ "$is_update" == "true" && -n "$saved_model" && "$saved_model" != "ggml-base.en.bin" ]]; then
+        sed -i '' "s|ggml-base.en.bin|$saved_model|g" "$voice_ptt_file"
+        echo "✓ Model setting restored: $saved_model"
+    fi
+
+    # Ensure init.lua loads voice-ptt (only add if not already present)
+    if [[ ! -f "$HAMMERSPOON_CONFIG" ]]; then
+        # No init.lua - create minimal one that loads voice-ptt
+        cat > "$HAMMERSPOON_CONFIG" << 'INITEOF'
+-- Hammerspoon configuration
+-- Add your customizations here
+
+-- Load voice-ptt push-to-talk transcription
+require('voice-ptt')
+INITEOF
+        echo "✓ Created init.lua with voice-ptt loader"
+    elif ! grep -q "require.*voice-ptt" "$HAMMERSPOON_CONFIG" 2>/dev/null; then
+        # init.lua exists but doesn't load voice-ptt - add it
+        echo "" >> "$HAMMERSPOON_CONFIG"
+        echo "-- Load voice-ptt push-to-talk transcription" >> "$HAMMERSPOON_CONFIG"
+        echo "require('voice-ptt')" >> "$HAMMERSPOON_CONFIG"
+        echo "✓ Added voice-ptt loader to existing init.lua"
+    else
+        echo "✓ init.lua already loads voice-ptt"
+    fi
+
+    if [[ "$is_update" == "true" ]]; then
+        echo "✓ voice-ptt.lua updated"
+    else
+        echo "✓ voice-ptt.lua created"
     fi
 }
 
-function write_hammerspoon_lua() {
+function write_voice_ptt_module() {
     local hotkey_display="$1"
-    cat > "$HAMMERSPOON_CONFIG" << LUAEOF
+    local voice_ptt_file="$HOME/.hammerspoon/voice-ptt.lua"
+    cat > "$voice_ptt_file" << LUAEOF
 -- Push-to-Talk Whisper Transcription
 -- Hold hotkey to record, release to transcribe and paste
 -- 100% local - no cloud, no data leaves your Mac
-
--- Hide console window on startup
-if hs.console.hswindow() then
-  hs.console.hswindow():close()
-end
+--
+-- This file is managed by voice-ptt installer.
+-- Safe to update - your init.lua customizations are preserved.
 
 local whisper = "/opt/homebrew/bin/whisper-cli"
 local sox = "/opt/homebrew/bin/sox"
@@ -691,10 +727,10 @@ function create_hotkey_command() {
 #!/bin/bash
 # voice-ptt-hotkey - Change the push-to-talk hotkey
 
-CONFIG_FILE="$HOME/.hammerspoon/init.lua"
+CONFIG_FILE="$HOME/.hammerspoon/voice-ptt.lua"
 
 if [[ ! -f "$CONFIG_FILE" ]]; then
-    echo "❌ Hammerspoon config not found. Run the installer first."
+    echo "❌ voice-ptt not installed. Run the installer first."
     exit 1
 fi
 
@@ -748,11 +784,11 @@ function create_model_command() {
 #!/bin/bash
 # voice-ptt-model - Switch between Whisper models
 
-CONFIG_FILE="$HOME/.hammerspoon/init.lua"
+CONFIG_FILE="$HOME/.hammerspoon/voice-ptt.lua"
 MODEL_DIR="$HOME/Library/Application Support/whisper.cpp"
 
 if [[ ! -f "$CONFIG_FILE" ]]; then
-    echo "❌ Hammerspoon config not found. Run the installer first."
+    echo "❌ voice-ptt not installed. Run the installer first."
     exit 1
 fi
 
@@ -806,7 +842,7 @@ function create_update_command() {
 # voice-ptt-update - Update voice-ptt to the latest version
 
 REPO_URL="https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/install.sh"
-CONFIG_FILE="$HOME/.hammerspoon/init.lua"
+CONFIG_FILE="$HOME/.hammerspoon/voice-ptt.lua"
 
 echo "═══════════════════════════════════════════════════════════════"
 echo "  Voice-PTT Update Checker"
@@ -814,7 +850,7 @@ echo "════════════════════════�
 echo
 
 # Check if voice-ptt is installed
-if [[ ! -f "$CONFIG_FILE" ]] || ! grep -q "Push-to-Talk Whisper" "$CONFIG_FILE" 2>/dev/null; then
+if [[ ! -f "$CONFIG_FILE" ]]; then
     echo "❌ voice-ptt not installed. Run the installer first:"
     echo "   curl -fsSL https://raw.githubusercontent.com/sparrowfm/voice-ptt/main/install.sh -o /tmp/install.sh && bash /tmp/install.sh"
     exit 1
@@ -822,7 +858,7 @@ fi
 
 echo "Checking for updates..."
 
-# Save current hotkey configuration
+# Show current settings (installer will preserve these)
 CURRENT_MODS=$(grep "^local mods = " "$CONFIG_FILE" | head -1 | sed 's/.*= //')
 CURRENT_KEY=$(grep "^local key = " "$CONFIG_FILE" | head -1 | sed 's/.*= //')
 
@@ -840,14 +876,6 @@ fi
 echo "✓ Downloaded latest version"
 echo
 
-# Backup current config
-BACKUP_FILE="$HOME/.hammerspoon/init.lua.backup.$(date +%Y%m%d%H%M%S)"
-if [[ -f "$CONFIG_FILE" ]]; then
-    cp "$CONFIG_FILE" "$BACKUP_FILE"
-    echo "✓ Backed up config to $(basename "$BACKUP_FILE")"
-    echo
-fi
-
 echo "─────────────────────────────────────────────────────────────────"
 read -p "Apply update? [y/N] " -n 1 -r
 echo
@@ -861,28 +889,17 @@ echo
 echo "Applying update..."
 echo "─────────────────────────────────────────────────────────────────"
 
-# Check if advanced cleanup was previously enabled
-CLEANUP_WAS_ENABLED=false
-CLEANUP_FILE="$HOME/.config/voice-ptt/cleanup-enabled"
-if [[ -f "$CLEANUP_FILE" ]]; then
-    CLEANUP_WAS_ENABLED=true
-    echo "✓ Advanced cleanup was enabled, will preserve setting"
-    echo
-fi
-
 # Run installer in non-interactive mode
+# The installer will:
+# - Preserve hotkey and model settings from voice-ptt.lua
+# - Update voice-ptt.lua with latest code
+# - Leave init.lua unchanged (user customizations preserved)
 bash "$TMP_INSTALLER" < /dev/null
 
-# Restore hotkey settings
-if [[ -f "$CONFIG_FILE" ]]; then
-    sed -i '' "s/^local mods = .*/local mods = $CURRENT_MODS/" "$CONFIG_FILE" 2>/dev/null
-    sed -i '' "s/^local key = .*/local key = $CURRENT_KEY/" "$CONFIG_FILE" 2>/dev/null
-fi
-
-# Restore advanced cleanup setting
-if [[ "$CLEANUP_WAS_ENABLED" == "true" ]]; then
-    touch "$CLEANUP_FILE"
-    echo "✓ Advanced cleanup setting restored"
+# Cleanup installer will preserve settings, no need to restore manually
+CLEANUP_FILE="$HOME/.config/voice-ptt/cleanup-enabled"
+if [[ -f "$CLEANUP_FILE" ]]; then
+    echo "✓ Advanced cleanup setting preserved"
 # If they didn't have it before, offer to install and enable it now
 elif [[ -t 0 ]]; then
     # Check if Ollama is installed (real app, not just wrapper)
