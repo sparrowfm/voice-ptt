@@ -700,6 +700,248 @@ test_advanced_cleanup() {
 }
 
 # ============================================================
+# TEST 16: Transcription quality - no LLM/Whisper artifacts
+# ============================================================
+test_transcription_quality() {
+    echo ""
+    echo -e "${YELLOW}TEST 16: Transcription quality - no artifacts${NC}"
+    echo "================================================"
+
+    # Check prerequisites
+    if [[ ! -x "$WHISPER" ]]; then
+        echo -e "${YELLOW}SKIP${NC}: whisper-cli not found"
+        return
+    fi
+    if [[ ! -f "$MODEL" ]]; then
+        echo -e "${YELLOW}SKIP${NC}: Whisper model not found"
+        return
+    fi
+
+    # Use aviary voice sample for quality test
+    local test_file="$TEST_AUDIO_DIR/aviary-broadcaster.wav"
+    if [[ ! -f "$test_file" ]]; then
+        echo -e "${YELLOW}SKIP${NC}: aviary-broadcaster.wav not found"
+        return
+    fi
+
+    local output_base="/tmp/whisper-quality-test"
+    "$WHISPER" -m "$MODEL" -f "$test_file" -otxt -of "$output_base" -np > /tmp/whisper-quality.log 2>&1
+
+    assert_file_exists "$output_base.txt" "Quality test transcription output created"
+
+    local transcribed=$(cat "$output_base.txt" 2>/dev/null | tr -d '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+    echo "  Transcribed: $transcribed"
+
+    # Check for common LLM artifacts that should NOT appear
+    local llm_artifacts=(
+        "Here is"
+        "Here's"
+        "Sure,"
+        "Certainly"
+        "I'll"
+        "I can"
+        "Let me"
+        "The text"
+        "The following"
+        "rewritten"
+        "cleaned"
+        "without filler"
+        "        "\`\`\`""
+        "Note:"
+        "Output:"
+    )
+
+    local artifact_found=false
+    for artifact in "${llm_artifacts[@]}"; do
+        if echo "$transcribed" | grep -qiF "$artifact"; then
+            echo -e "${RED}FAIL${NC}: LLM artifact found: '$artifact'"
+            ((TESTS_FAILED++))
+            artifact_found=true
+        fi
+    done
+
+    if [[ "$artifact_found" == "false" ]]; then
+        echo -e "${GREEN}PASS${NC}: No LLM artifacts in transcription"
+        ((TESTS_PASSED++))
+    fi
+
+    # Check for common Whisper hallucination patterns
+    local whisper_artifacts=(
+        "Thank you for watching"
+        "Subscribe"
+        "Like and subscribe"
+        "Please subscribe"
+        "Thanks for watching"
+        "See you next time"
+        "[Music]"
+        "[Applause]"
+        "(music)"
+        "♪"
+    )
+
+    local hallucination_found=false
+    for artifact in "${whisper_artifacts[@]}"; do
+        if echo "$transcribed" | grep -qiF "$artifact"; then
+            echo -e "${RED}FAIL${NC}: Whisper hallucination found: '$artifact'"
+            ((TESTS_FAILED++))
+            hallucination_found=true
+        fi
+    done
+
+    if [[ "$hallucination_found" == "false" ]]; then
+        echo -e "${GREEN}PASS${NC}: No Whisper hallucinations detected"
+        ((TESTS_PASSED++))
+    fi
+
+    # Verify expected content is present (broadcaster says "Good evening")
+    assert_contains_text "$transcribed" "evening" "Expected content 'evening' present"
+    assert_contains_text "$transcribed" "live" "Expected content 'live' present"
+
+    rm -f "$output_base.txt"
+}
+
+# ============================================================
+# TEST 17: Transcription accuracy with known text
+# ============================================================
+test_transcription_accuracy() {
+    echo ""
+    echo -e "${YELLOW}TEST 17: Transcription accuracy with known text${NC}"
+    echo "================================================"
+
+    # Check prerequisites
+    if [[ ! -x "$WHISPER" ]]; then
+        echo -e "${YELLOW}SKIP${NC}: whisper-cli not found"
+        return
+    fi
+    if [[ ! -f "$MODEL" ]]; then
+        echo -e "${YELLOW}SKIP${NC}: Whisper model not found"
+        return
+    fi
+
+    # Test with hidden-brain sample (known text: "The mind is its own place...")
+    local test_file="$TEST_AUDIO_DIR/aviary-hidden-brain.wav"
+    if [[ ! -f "$test_file" ]]; then
+        echo -e "${YELLOW}SKIP${NC}: aviary-hidden-brain.wav not found"
+        return
+    fi
+
+    local output_base="/tmp/whisper-accuracy-test"
+    "$WHISPER" -m "$MODEL" -f "$test_file" -otxt -of "$output_base" -np > /tmp/whisper-accuracy.log 2>&1
+
+    local transcribed=$(cat "$output_base.txt" 2>/dev/null | tr -d '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+    echo "  Transcribed: $transcribed"
+
+    # Known text: "The mind is its own place, and in itself can make a heaven of hell, a hell of heaven."
+    # Check key phrases are accurately transcribed
+    assert_contains_text "$transcribed" "mind" "Transcription contains 'mind'"
+    assert_contains_text "$transcribed" "place" "Transcription contains 'place'"
+    assert_contains_text "$transcribed" "heaven" "Transcription contains 'heaven'"
+    assert_contains_text "$transcribed" "hell" "Transcription contains 'hell'"
+
+    # Check there's no weird repetition (common Whisper bug)
+    local heaven_count=$(echo "$transcribed" | grep -io "heaven" | wc -l | tr -d ' ')
+    if [[ "$heaven_count" -le 3 ]]; then
+        echo -e "${GREEN}PASS${NC}: No excessive word repetition (heaven count: $heaven_count)"
+        ((TESTS_PASSED++))
+    else
+        echo -e "${RED}FAIL${NC}: Excessive word repetition detected (heaven count: $heaven_count)"
+        ((TESTS_FAILED++))
+    fi
+
+    rm -f "$output_base.txt"
+}
+
+# ============================================================
+# TEST 18: Advanced cleanup produces clean output (no LLM junk)
+# ============================================================
+test_advanced_cleanup_quality() {
+    echo ""
+    echo -e "${YELLOW}TEST 18: Advanced cleanup output quality${NC}"
+    echo "================================================"
+
+    # Check if Ollama is available
+    local ollama_path=""
+    if command -v ollama &> /dev/null; then
+        ollama_path=$(command -v ollama)
+    elif [[ -x "/Applications/Ollama.app/Contents/Resources/ollama" ]]; then
+        ollama_path="/Applications/Ollama.app/Contents/Resources/ollama"
+    fi
+
+    if [[ -z "$ollama_path" ]]; then
+        echo -e "${YELLOW}SKIP${NC}: Ollama not installed"
+        return
+    fi
+
+    if ! pgrep -x "ollama" > /dev/null && ! pgrep -f "Ollama" > /dev/null; then
+        echo -e "${YELLOW}SKIP${NC}: Ollama service not running"
+        return
+    fi
+
+    if ! "$ollama_path" list 2>/dev/null | grep -q "llama3.2:3b"; then
+        echo -e "${YELLOW}SKIP${NC}: llama3.2:3b model not installed"
+        return
+    fi
+
+    # Test with realistic transcription text
+    local test_text="Um, so like, I was thinking, you know, that we should probably, uh, go to the store later today."
+    local prompt="Remove ONLY filler words (um, uh, like, you know, so) from the text. Keep all other words and meaning intact. Return {\"result\": \"cleaned text here\"}\n\nText: \"$test_text\""
+
+    local result=$("$ollama_path" run llama3.2:3b --format json "$prompt" 2>/dev/null)
+    local cleaned=$(echo "$result" | grep -o '"result"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*: *"//' | sed 's/"$//')
+
+    echo "  Input:  $test_text"
+    echo "  Output: $cleaned"
+
+    # Check for LLM artifacts that indicate the model added commentary
+    local llm_junk_patterns=(
+        "Here is"
+        "Here's"
+        "Sure"
+        "Certainly"
+        "I've removed"
+        "I removed"
+        "The cleaned"
+        "without filler"
+        "filler words"
+        "Note:"
+        "Result:"
+    )
+
+    local junk_found=false
+    for pattern in "${llm_junk_patterns[@]}"; do
+        if echo "$cleaned" | grep -qiF "$pattern"; then
+            echo -e "${RED}FAIL${NC}: LLM added commentary: '$pattern'"
+            ((TESTS_FAILED++))
+            junk_found=true
+        fi
+    done
+
+    if [[ "$junk_found" == "false" ]]; then
+        echo -e "${GREEN}PASS${NC}: No LLM commentary in output"
+        ((TESTS_PASSED++))
+    fi
+
+    # Check the output still contains the core message
+    if echo "$cleaned" | grep -qi "store"; then
+        echo -e "${GREEN}PASS${NC}: Core message preserved ('store' present)"
+        ((TESTS_PASSED++))
+    else
+        echo -e "${RED}FAIL${NC}: Core message lost ('store' missing)"
+        ((TESTS_FAILED++))
+    fi
+
+    # Check output is roughly the right length (not too long = added junk, not too short = lost content)
+    local output_len=${#cleaned}
+    if [[ $output_len -gt 20 && $output_len -lt 200 ]]; then
+        echo -e "${GREEN}PASS${NC}: Output length reasonable ($output_len chars)"
+        ((TESTS_PASSED++))
+    else
+        echo -e "${RED}FAIL${NC}: Output length suspicious ($output_len chars)"
+        ((TESTS_FAILED++))
+    fi
+}
+
+# ============================================================
 # MAIN
 # ============================================================
 
@@ -731,6 +973,11 @@ test_basic_cleanup
 test_transcription_with_fillers
 test_sox_recording
 test_advanced_cleanup
+
+# Quality tests
+test_transcription_quality
+test_transcription_accuracy
+test_advanced_cleanup_quality
 
 # Summary
 echo ""
