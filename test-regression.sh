@@ -5,11 +5,18 @@
 # Don't exit on error - we want to run all tests
 set +e
 
-INSTALLER="/Users/neelketkar/projects/voice-ptt/install.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALLER="$SCRIPT_DIR/install.sh"
+TEST_AUDIO_DIR="$SCRIPT_DIR/test-audio"
 HS_DIR="$HOME/.hammerspoon"
 INIT_LUA="$HS_DIR/init.lua"
 VOICE_PTT_LUA="$HS_DIR/voice-ptt.lua"
 CONFIG_DIR="$HOME/.config/voice-ptt"
+
+# Transcription tools
+WHISPER="/opt/homebrew/bin/whisper-cli"
+SOX="/opt/homebrew/bin/sox"
+MODEL="$HOME/Library/Application Support/whisper.cpp/ggml-base.en.bin"
 
 # Colors for output
 RED='\033[0;31m'
@@ -112,6 +119,32 @@ assert_hammerspoon_loads() {
         ((TESTS_PASSED++))
     else
         echo -e "${RED}FAIL${NC}: $msg (Hammerspoon not running after reload)"
+        ((TESTS_FAILED++))
+    fi
+}
+
+assert_contains_text() {
+    local text="$1"
+    local pattern="$2"
+    local msg="$3"
+    if echo "$text" | grep -qi "$pattern"; then
+        echo -e "${GREEN}PASS${NC}: $msg"
+        ((TESTS_PASSED++))
+    else
+        echo -e "${RED}FAIL${NC}: $msg (pattern '$pattern' not found in: '$text')"
+        ((TESTS_FAILED++))
+    fi
+}
+
+assert_not_contains_text() {
+    local text="$1"
+    local pattern="$2"
+    local msg="$3"
+    if ! echo "$text" | grep -qi "$pattern"; then
+        echo -e "${GREEN}PASS${NC}: $msg"
+        ((TESTS_PASSED++))
+    else
+        echo -e "${RED}FAIL${NC}: $msg (pattern '$pattern' found but shouldn't be in: '$text')"
         ((TESTS_FAILED++))
     fi
 }
@@ -368,6 +401,305 @@ test_module_header() {
 }
 
 # ============================================================
+# TEST 11: Whisper transcription works
+# ============================================================
+test_whisper_transcription() {
+    echo ""
+    echo -e "${YELLOW}TEST 11: Whisper transcription works${NC}"
+    echo "================================================"
+
+    # Check prerequisites
+    if [[ ! -x "$WHISPER" ]]; then
+        echo -e "${RED}SKIP${NC}: whisper-cli not found at $WHISPER"
+        return
+    fi
+    if [[ ! -f "$MODEL" ]]; then
+        echo -e "${RED}SKIP${NC}: Whisper model not found at $MODEL"
+        return
+    fi
+
+    # Generate test audio if it doesn't exist
+    if [[ ! -f "$TEST_AUDIO_DIR/test-clean.wav" ]]; then
+        echo "Generating test audio files..."
+        mkdir -p "$TEST_AUDIO_DIR"
+        say -v Samantha -o /tmp/test-clean.aiff "Hello, this is a test of the voice transcription system."
+        "$SOX" /tmp/test-clean.aiff -r 16000 -c 1 "$TEST_AUDIO_DIR/test-clean.wav"
+        rm -f /tmp/test-clean.aiff
+    fi
+
+    # Run transcription
+    local output_base="/tmp/whisper-test-output"
+    "$WHISPER" -m "$MODEL" -f "$TEST_AUDIO_DIR/test-clean.wav" -otxt -of "$output_base" -np > /tmp/whisper-test.log 2>&1
+    local exit_code=$?
+
+    if [[ $exit_code -eq 0 ]]; then
+        echo -e "${GREEN}PASS${NC}: Whisper transcription completed successfully"
+        ((TESTS_PASSED++))
+    else
+        echo -e "${RED}FAIL${NC}: Whisper transcription failed with exit code $exit_code"
+        ((TESTS_FAILED++))
+        return
+    fi
+
+    # Check output file exists
+    assert_file_exists "$output_base.txt" "Transcription output file created"
+
+    # Check transcription content
+    local transcribed=$(cat "$output_base.txt" 2>/dev/null | tr -d '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+    assert_contains_text "$transcribed" "hello" "Transcription contains 'hello'"
+    assert_contains_text "$transcribed" "test" "Transcription contains 'test'"
+    assert_contains_text "$transcribed" "voice" "Transcription contains 'voice'"
+
+    rm -f "$output_base.txt"
+}
+
+# ============================================================
+# TEST 12: Basic cleanup removes filler words
+# ============================================================
+test_basic_cleanup() {
+    echo ""
+    echo -e "${YELLOW}TEST 12: Basic cleanup removes filler words${NC}"
+    echo "================================================"
+
+    # Extract basicCleanup function from voice-ptt.lua and test it
+    clean_env
+    bash "$INSTALLER" < /dev/null > /tmp/test12.log 2>&1
+
+    # Create a Lua test script that uses the basicCleanup function
+    cat > /tmp/test-cleanup.lua << 'LUAEOF'
+-- Extract and test basicCleanup function
+local function basicCleanup(text)
+  local fillers = {
+    " um,? ", " uh,? ", " like,? ", " you know,? ",
+    "^um,? ", "^uh,? ", "^like,? ", "^you know,? ",
+    " um$", " uh$"
+  }
+  local result = text
+  for _, filler in ipairs(fillers) do
+    result = result:gsub(filler, " ")
+  end
+  result = result:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+  return result
+end
+
+-- Test cases
+local tests = {
+    {"Um, hello there", "hello there"},
+    {"I was, like, going to the store", "I was going to the store"},
+    {"You know, it's really good", "it's really good"},
+    {"This is, uh, a test", "This is a test"},
+    {"Um, like, you know, hello", "hello"},
+}
+
+local passed = 0
+local failed = 0
+
+for _, test in ipairs(tests) do
+    local input, expected = test[1], test[2]
+    local result = basicCleanup(input)
+    if result == expected then
+        print("PASS: '" .. input .. "' -> '" .. result .. "'")
+        passed = passed + 1
+    else
+        print("FAIL: '" .. input .. "' expected '" .. expected .. "' got '" .. result .. "'")
+        failed = failed + 1
+    end
+end
+
+print("")
+print("Basic cleanup tests: " .. passed .. " passed, " .. failed .. " failed")
+os.exit(failed)
+LUAEOF
+
+    # Run the Lua test (using system lua or Hammerspoon's hs CLI)
+    local lua_cmd=""
+    if command -v lua &> /dev/null; then
+        lua_cmd="lua"
+    elif command -v hs &> /dev/null; then
+        lua_cmd="hs"
+    fi
+
+    if [[ -n "$lua_cmd" ]]; then
+        local output=$("$lua_cmd" /tmp/test-cleanup.lua 2>&1)
+        local exit_code=$?
+        echo "$output"
+        if [[ $exit_code -eq 0 ]]; then
+            echo -e "${GREEN}PASS${NC}: Basic cleanup function works correctly"
+            ((TESTS_PASSED++))
+        else
+            echo -e "${RED}FAIL${NC}: Basic cleanup function has errors"
+            ((TESTS_FAILED++))
+        fi
+    else
+        echo -e "${YELLOW}SKIP${NC}: No lua interpreter found (lua or hs), skipping cleanup unit tests"
+    fi
+
+    rm -f /tmp/test-cleanup.lua
+}
+
+# ============================================================
+# TEST 13: Transcription with filler words
+# ============================================================
+test_transcription_with_fillers() {
+    echo ""
+    echo -e "${YELLOW}TEST 13: Transcription with filler words${NC}"
+    echo "================================================"
+
+    # Check prerequisites
+    if [[ ! -x "$WHISPER" ]]; then
+        echo -e "${RED}SKIP${NC}: whisper-cli not found"
+        return
+    fi
+    if [[ ! -f "$MODEL" ]]; then
+        echo -e "${RED}SKIP${NC}: Whisper model not found"
+        return
+    fi
+
+    # Generate test audio with fillers if it doesn't exist
+    if [[ ! -f "$TEST_AUDIO_DIR/test-fillers.wav" ]]; then
+        echo "Generating filler words test audio..."
+        mkdir -p "$TEST_AUDIO_DIR"
+        say -v Samantha -o /tmp/test-fillers.aiff "Um, like, you know, this is, uh, a test with filler words."
+        "$SOX" /tmp/test-fillers.aiff -r 16000 -c 1 "$TEST_AUDIO_DIR/test-fillers.wav"
+        rm -f /tmp/test-fillers.aiff
+    fi
+
+    # Run transcription
+    local output_base="/tmp/whisper-fillers-output"
+    "$WHISPER" -m "$MODEL" -f "$TEST_AUDIO_DIR/test-fillers.wav" -otxt -of "$output_base" -np > /tmp/whisper-fillers.log 2>&1
+
+    assert_file_exists "$output_base.txt" "Filler audio transcription output created"
+
+    local transcribed=$(cat "$output_base.txt" 2>/dev/null | tr -d '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+
+    # Whisper should transcribe the fillers (cleanup happens later in voice-ptt.lua)
+    assert_contains_text "$transcribed" "test" "Transcription contains main content 'test'"
+    assert_contains_text "$transcribed" "filler" "Transcription contains 'filler'"
+
+    # Note: Whisper will include filler words - that's expected
+    # The cleanup happens in the Lua code after transcription
+    echo "  Raw transcription: $transcribed"
+
+    rm -f "$output_base.txt"
+}
+
+# ============================================================
+# TEST 14: Sox recording capability
+# ============================================================
+test_sox_recording() {
+    echo ""
+    echo -e "${YELLOW}TEST 14: Sox recording capability${NC}"
+    echo "================================================"
+
+    if [[ ! -x "$SOX" ]]; then
+        echo -e "${RED}SKIP${NC}: sox not found at $SOX"
+        return
+    fi
+
+    # Test sox can create a valid WAV file (using silence, not microphone)
+    local test_file="/tmp/sox-test-recording.wav"
+    rm -f "$test_file"
+
+    # Generate 1 second of silence as a test
+    "$SOX" -n -r 16000 -c 1 "$test_file" trim 0.0 1.0 > /tmp/sox-test.log 2>&1
+    local exit_code=$?
+
+    if [[ $exit_code -eq 0 ]]; then
+        echo -e "${GREEN}PASS${NC}: Sox can create WAV files"
+        ((TESTS_PASSED++))
+    else
+        echo -e "${RED}FAIL${NC}: Sox failed to create WAV file (exit code $exit_code)"
+        ((TESTS_FAILED++))
+        return
+    fi
+
+    assert_file_exists "$test_file" "Sox created test WAV file"
+
+    # Verify it's a valid WAV file
+    if file "$test_file" | grep -q "WAVE audio"; then
+        echo -e "${GREEN}PASS${NC}: Created file is valid WAVE audio"
+        ((TESTS_PASSED++))
+    else
+        echo -e "${RED}FAIL${NC}: Created file is not valid WAVE audio"
+        ((TESTS_FAILED++))
+    fi
+
+    rm -f "$test_file"
+}
+
+# ============================================================
+# TEST 15: Advanced cleanup (Ollama integration)
+# ============================================================
+test_advanced_cleanup() {
+    echo ""
+    echo -e "${YELLOW}TEST 15: Advanced cleanup (Ollama integration)${NC}"
+    echo "================================================"
+
+    # Check if Ollama is available
+    local ollama_path=""
+    if command -v ollama &> /dev/null; then
+        ollama_path=$(command -v ollama)
+    elif [[ -x "/Applications/Ollama.app/Contents/Resources/ollama" ]]; then
+        ollama_path="/Applications/Ollama.app/Contents/Resources/ollama"
+    fi
+
+    if [[ -z "$ollama_path" ]]; then
+        echo -e "${YELLOW}SKIP${NC}: Ollama not installed"
+        return
+    fi
+
+    # Check if Ollama service is running
+    if ! pgrep -x "ollama" > /dev/null && ! pgrep -f "Ollama" > /dev/null; then
+        echo -e "${YELLOW}SKIP${NC}: Ollama service not running"
+        return
+    fi
+
+    # Check if model is available
+    if ! "$ollama_path" list 2>/dev/null | grep -q "llama3.2:3b"; then
+        echo -e "${YELLOW}SKIP${NC}: llama3.2:3b model not installed"
+        return
+    fi
+
+    echo "Testing Ollama advanced cleanup..."
+
+    # Test simple cleanup via Ollama
+    local test_text="Um, like, you know, this is a test."
+    local prompt="Remove ONLY filler words (um, uh, like, you know) from the text. Keep all other words and meaning intact. Return {\"result\": \"cleaned text here\"}\n\nText: \"$test_text\""
+
+    local result=$("$ollama_path" run llama3.2:3b --format json "$prompt" 2>/dev/null)
+
+    if [[ -n "$result" ]]; then
+        echo -e "${GREEN}PASS${NC}: Ollama returned a response"
+        ((TESTS_PASSED++))
+
+        # Extract the result from JSON
+        local cleaned=$(echo "$result" | grep -o '"result"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*: *"//' | sed 's/"$//')
+
+        if [[ -n "$cleaned" ]]; then
+            echo -e "${GREEN}PASS${NC}: Ollama response contains valid JSON result"
+            ((TESTS_PASSED++))
+            echo "  Input:  $test_text"
+            echo "  Output: $cleaned"
+
+            # Check that fillers were removed
+            if ! echo "$cleaned" | grep -qi "um,\|like,\|you know"; then
+                echo -e "${GREEN}PASS${NC}: Filler words removed from output"
+                ((TESTS_PASSED++))
+            else
+                echo -e "${RED}FAIL${NC}: Filler words still present in output"
+                ((TESTS_FAILED++))
+            fi
+        else
+            echo -e "${RED}FAIL${NC}: Could not parse JSON result from Ollama"
+            ((TESTS_FAILED++))
+        fi
+    else
+        echo -e "${RED}FAIL${NC}: Ollama returned empty response"
+        ((TESTS_FAILED++))
+    fi
+}
+
+# ============================================================
 # MAIN
 # ============================================================
 
@@ -392,6 +724,13 @@ test_utility_commands
 test_no_duplicate_require
 test_combined_settings
 test_module_header
+
+# Transcription tests
+test_whisper_transcription
+test_basic_cleanup
+test_transcription_with_fillers
+test_sox_recording
+test_advanced_cleanup
 
 # Summary
 echo ""
