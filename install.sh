@@ -3,7 +3,7 @@
 # Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install.sh
 
-VERSION="1.4.6"  # Update this when making changes
+VERSION="1.4.7"  # Update this when making changes
 
 # Configuration constants
 readonly WHISPER_MODEL_DIR="$HOME/Library/Application Support/whisper.cpp"
@@ -222,7 +222,7 @@ function configure_advanced_cleanup() {
     echo "Advanced cleanup (optional):"
     echo "  • LLM-based intelligent cleanup"
     echo "  • Better punctuation and context awareness"
-    echo "  • Requires Ollama + llama3.2:1b (~1.3GB)"
+    echo "  • Requires Ollama + llama3.2:3b (~2GB)"
     echo "  • Adds ~1-2s to transcription time"
     echo ""
 
@@ -263,9 +263,9 @@ function configure_advanced_cleanup() {
         echo "✓ Ollama service started"
     fi
 
-    echo "Downloading llama3.2:1b model (~1.3GB)..."
+    echo "Downloading llama3.2:3b model (~2GB)..."
     echo "This may take a few minutes..."
-    if ! ollama pull llama3.2:1b; then
+    if ! ollama pull llama3.2:3b; then
         echo "❌ Model download failed, advanced cleanup will be disabled"
         echo ""
         echo "Troubleshooting:"
@@ -353,79 +353,9 @@ local recordingTask = nil
 local mods = $HOTKEY_MODS
 local key = "$HOTKEY_KEY"
 
-hs.hotkey.bind(mods, key,
-  function()
-    hs.alert.show("Recording...")
-    recordingTask = hs.task.new(sox, nil, {"-d", "-r", "16000", "-c", "1", recordFile})
-    recordingTask:start()
-  end,
-  function()
-    -- Show persistent indicator (won't auto-dismiss)
-    hs.alert.show("Transcribing...", 999)
-
-    if recordingTask then
-      recordingTask:terminate()
-      recordingTask = nil
-    end
-    hs.execute("pkill -9 sox 2>/dev/null", true)
-    hs.timer.usleep(300000)
-
-    local recCheck = io.open(recordFile, "r")
-    if recCheck then
-      recCheck:close()
-    else
-      hs.alert.closeAll()  -- Clear "Transcribing..." indicator
-      hs.alert.show("No recording!")
-      return
-    end
-
-    local whisperTask = hs.task.new(whisper,
-      function(exitCode, stdOut, stdErr)
-        hs.alert.closeAll()  -- Clear "Transcribing..." indicator
-
-        if exitCode == 0 then
-          local f = io.open(outputFile, "r")
-          if f then
-            local text = f:read("*all")
-            f:close()
-            -- Remove internal newlines (whisper adds these during segmentation)
-            text = text:gsub("\n", " "):gsub("^%s+", ""):gsub("%s+$", "")
-
-            if text and text ~= "" then
-              -- Apply basic cleanup (always enabled)
-              text = basicCleanup(text)
-
-              -- Apply custom dictionary (always enabled, fast)
-              text = applyDictionary(text)
-
-              -- Apply advanced LLM cleanup if enabled
-              if advancedCleanupEnabled and ollamaPath then
-                local cleaned = advancedCleanup(text, ollamaPath)
-                if cleaned then
-                  text = cleaned
-                end
-              end
-
-              hs.pasteboard.setContents(text)
-              hs.eventtap.keyStroke({"cmd"}, "v")
-              hs.alert.show("Done")
-            else
-              hs.alert.show("No speech detected")
-            end
-          else
-            hs.alert.show("Transcription failed")
-          end
-        else
-          hs.alert.show("Error: " .. tostring(exitCode))
-        end
-        os.remove(recordFile)
-        os.remove(outputFile)
-      end,
-      {"-m", model, "-f", recordFile, "-otxt", "-of", outputBase, "-np"}
-    )
-    whisperTask:start()
-  end
-)
+-- ============================================================
+-- HELPER FUNCTIONS (must be defined before hs.hotkey.bind)
+-- ============================================================
 
 -- Custom dictionary for text replacements
 local dictionaryEntries = {}
@@ -538,27 +468,46 @@ local function findOllama()
 end
 
 local function advancedCleanup(text, ollamaPath)
-  -- LLM-based cleanup (requires Ollama)
-  local prompt = "Remove filler words (um, uh, like, you know) and fix punctuation. Keep meaning and style."
+  -- LLM-based cleanup using JSON format mode (no preamble possible)
+  -- Escape for valid JSON: backslashes, quotes, and control characters
+  local escapedText = text
+    :gsub('\\\\', '\\\\\\\\')  -- backslash
+    :gsub('"', '\\\\"')        -- double quote
+    :gsub('\\t', ' ')          -- tab -> space
+    :gsub('\\r', '')           -- carriage return -> remove
+    :gsub('\\n', ' ')          -- newline -> space (shouldn't happen, but safety)
+
+  -- Build prompt with optional dictionary context
+  local prompt = 'Remove ONLY filler words (um, uh, like, you know) from the text. Keep all other words and meaning intact. Fix punctuation if needed.'
 
   -- Add dictionary context if entries exist
   if #dictionaryEntries > 0 then
-    prompt = prompt .. " Apply these preferred terms:"
+    prompt = prompt .. ' Also apply these preferred terms:'
     for _, entry in ipairs(dictionaryEntries) do
-      prompt = prompt .. "\\n- Use '" .. entry.replace .. "' for '" .. entry.find .. "'"
+      prompt = prompt .. ' Use "' .. entry.replace .. '" instead of "' .. entry.find .. '".'
     end
   end
 
-  prompt = prompt .. "\\n\\nOutput only the cleaned text:\\n\\n" .. text
+  prompt = prompt .. ' Return {"result": "cleaned text here"}\\n\\nText: "' .. escapedText .. '"'
 
   -- Escape single quotes for shell
   prompt = prompt:gsub("'", "'\\\\''")
 
-  local cmd = ollamaPath .. " run llama3.2:1b '" .. prompt .. "' 2>/dev/null"
+  local cmd = ollamaPath .. " run llama3.2:3b --format json '" .. prompt .. "' 2>/dev/null"
   local result, status = hs.execute(cmd)
 
   if status and result and result ~= "" then
-    return result:gsub("^%s+", ""):gsub("%s+$", "")
+    -- Parse JSON response to extract the cleaned text
+    local cleaned = result:match('"result"%s*:%s*"(.-)"')
+    if cleaned then
+      -- Unescape JSON string escapes
+      cleaned = cleaned
+        :gsub('\\\\n', ' ')        -- escaped newline -> space
+        :gsub('\\\\t', ' ')        -- escaped tab -> space
+        :gsub('\\\\"', '"')        -- escaped quote -> quote
+        :gsub('\\\\\\\\', '\\\\')  -- escaped backslash -> backslash
+      return cleaned:gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s+", " ")
+    end
   end
 
   return nil  -- Fallback to basic cleanup
@@ -578,7 +527,88 @@ if f then
   end
 end
 
--- Auto-update checker (runs every 7 days)
+-- ============================================================
+-- HOTKEY BINDING (uses functions defined above)
+-- ============================================================
+
+hs.hotkey.bind(mods, key,
+  function()
+    hs.alert.show("Recording...")
+    recordingTask = hs.task.new(sox, nil, {"-d", "-r", "16000", "-c", "1", recordFile})
+    recordingTask:start()
+  end,
+  function()
+    -- Show persistent indicator (won't auto-dismiss)
+    hs.alert.show("Transcribing...", 999)
+
+    if recordingTask then
+      recordingTask:terminate()
+      recordingTask = nil
+    end
+    hs.execute("pkill -9 sox 2>/dev/null", true)
+    hs.timer.usleep(300000)
+
+    local recCheck = io.open(recordFile, "r")
+    if recCheck then
+      recCheck:close()
+    else
+      hs.alert.closeAll()  -- Clear "Transcribing..." indicator
+      hs.alert.show("No recording!")
+      return
+    end
+
+    local whisperTask = hs.task.new(whisper,
+      function(exitCode, stdOut, stdErr)
+        hs.alert.closeAll()  -- Clear "Transcribing..." indicator
+
+        if exitCode == 0 then
+          local f = io.open(outputFile, "r")
+          if f then
+            local text = f:read("*all")
+            f:close()
+            -- Remove internal newlines (whisper adds these during segmentation)
+            text = text:gsub("\n", " "):gsub("^%s+", ""):gsub("%s+$", "")
+
+            if text and text ~= "" then
+              -- Apply basic cleanup (always enabled)
+              text = basicCleanup(text)
+
+              -- Apply custom dictionary (always enabled, fast)
+              text = applyDictionary(text)
+
+              -- Apply advanced LLM cleanup if enabled
+              if advancedCleanupEnabled and ollamaPath then
+                local cleaned = advancedCleanup(text, ollamaPath)
+                if cleaned then
+                  text = cleaned
+                end
+              end
+
+              hs.pasteboard.setContents(text)
+              hs.eventtap.keyStroke({"cmd"}, "v")
+              hs.alert.show("Done")
+            else
+              hs.alert.show("No speech detected")
+            end
+          else
+            hs.alert.show("Transcription failed")
+          end
+        else
+          hs.alert.show("Error: " .. tostring(exitCode))
+        end
+        os.remove(recordFile)
+        os.remove(outputFile)
+      end,
+      {"-m", model, "-f", recordFile, "-otxt", "-of", outputBase, "-np"}
+    )
+    whisperTask:start()
+  end
+)
+
+-- ============================================================
+-- AUTO-UPDATE CHECKER
+-- ============================================================
+
 local function checkForUpdates()
   local versionFile = os.getenv("HOME") .. "/.config/voice-ptt/version"
   local lastCheckFile = os.getenv("HOME") .. "/.config/voice-ptt/last-check"
@@ -906,8 +936,8 @@ elif [[ -t 0 ]]; then
                 fi
 
                 # Download model
-                echo "Downloading llama3.2:1b model (~1.3GB)..."
-                if /Applications/Ollama.app/Contents/Resources/ollama pull llama3.2:1b; then
+                echo "Downloading llama3.2:3b model (~2GB)..."
+                if /Applications/Ollama.app/Contents/Resources/ollama pull llama3.2:3b; then
                     touch "$CLEANUP_FILE"
                     echo "✓ Advanced cleanup enabled"
                 else
@@ -944,8 +974,8 @@ elif [[ -t 0 ]]; then
                 sleep 3
             fi
 
-            echo "Downloading llama3.2:1b model (~1.3GB)..."
-            if ollama pull llama3.2:1b; then
+            echo "Downloading llama3.2:3b model (~2GB)..."
+            if ollama pull llama3.2:3b; then
                 touch "$CLEANUP_FILE"
                 echo "✓ Advanced cleanup enabled"
             else
@@ -996,10 +1026,10 @@ show_status() {
     local ollama_path=""
     if ollama_path=$(find_ollama); then
       echo "  - Ollama: $ollama_path"
-      if "$ollama_path" list 2>/dev/null | grep -q "llama3.2:1b"; then
-        echo "  - Model: llama3.2:1b (ready)"
+      if "$ollama_path" list 2>/dev/null | grep -q "llama3.2:3b"; then
+        echo "  - Model: llama3.2:3b (ready)"
       else
-        echo "  - Model: llama3.2:1b (not downloaded)"
+        echo "  - Model: llama3.2:3b (not downloaded)"
       fi
     else
       echo "  - Ollama: NOT FOUND (cleanup won't work)"
@@ -1095,11 +1125,11 @@ enable_advanced() {
   echo ""
 
   # Check if model exists
-  if ! "$OLLAMA_PATH" list 2>/dev/null | grep -q "llama3.2:1b"; then
-    echo "Downloading llama3.2:1b model (~1.3GB, one-time)..."
+  if ! "$OLLAMA_PATH" list 2>/dev/null | grep -q "llama3.2:3b"; then
+    echo "Downloading llama3.2:3b model (~2GB, one-time)..."
     echo "This may take a few minutes..."
     echo ""
-    if ! "$OLLAMA_PATH" pull llama3.2:1b 2>&1 | tee /tmp/ollama-pull.log; then
+    if ! "$OLLAMA_PATH" pull llama3.2:3b 2>&1 | tee /tmp/ollama-pull.log; then
       echo ""
       echo "❌ Failed to download model"
       echo ""
@@ -1113,7 +1143,7 @@ enable_advanced() {
       exit 1
     fi
   else
-    echo "✓ Model llama3.2:1b already downloaded"
+    echo "✓ Model llama3.2:3b already downloaded"
   fi
 
   # Enable cleanup
