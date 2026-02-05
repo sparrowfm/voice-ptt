@@ -3,7 +3,7 @@
 # Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install.sh
 
-VERSION="1.4.8"  # Update this when making changes
+VERSION="1.4.9"  # Update this when making changes
 
 # Configuration constants
 readonly WHISPER_MODEL_DIR="$HOME/Library/Application Support/whisper.cpp"
@@ -649,14 +649,14 @@ local function checkForUpdates()
   local versionFile = os.getenv("HOME") .. "/.config/voice-ptt/version"
   local lastCheckFile = os.getenv("HOME") .. "/.config/voice-ptt/last-check"
 
-  -- Check if it's time to check for updates (every 7 days)
+  -- Check if it's time to check for updates (once per day)
   local shouldCheck = false
   local lastCheckF = io.open(lastCheckFile, "r")
   if lastCheckF then
     local lastCheck = tonumber(lastCheckF:read("*all"))
     lastCheckF:close()
     local daysSinceCheck = (os.time() - lastCheck) / 86400
-    shouldCheck = daysSinceCheck >= 7
+    shouldCheck = daysSinceCheck >= 1
   else
     shouldCheck = true  -- First run
   end
@@ -697,7 +697,7 @@ local function checkForUpdates()
   end
 end
 
--- Check for updates 30 seconds after launch, then every 7 days
+-- Check for updates 30 seconds after launch, then daily
 hs.timer.doAfter(30, checkForUpdates)
 
 hs.alert.show("Voice transcription ready ($hotkey_display)")
