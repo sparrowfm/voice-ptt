@@ -380,6 +380,7 @@ local sox = "/opt/homebrew/bin/sox"
 local model = os.getenv("HOME") .. "/Library/Application Support/whisper.cpp/ggml-base.en.bin"
 
 local recordFile = os.getenv("HOME") .. "/rec_temp.wav"
+local trimmedFile = os.getenv("HOME") .. "/rec_trimmed.wav"
 local outputBase = os.getenv("HOME") .. "/transcribed"
 local outputFile = outputBase .. ".txt"
 
@@ -593,6 +594,19 @@ hs.hotkey.bind(mods, key,
       return
     end
 
+    -- Trim leading/trailing silence to speed up whisper and reduce hallucinations
+    hs.execute(sox .. " '" .. recordFile .. "' '" .. trimmedFile .. "' silence 1 0.1 1% reverse silence 1 0.1 1% reverse 2>/dev/null", true)
+    -- Use trimmed file if it exists and has content, otherwise fall back to original
+    local useFile = recordFile
+    local trimCheck = io.open(trimmedFile, "r")
+    if trimCheck then
+      local size = trimCheck:seek("end")
+      trimCheck:close()
+      if size and size > 44 then  -- WAV header is 44 bytes; skip empty files
+        useFile = trimmedFile
+      end
+    end
+
     local whisperTask = hs.task.new(whisper,
       function(exitCode, stdOut, stdErr)
         hs.alert.closeAll()  -- Clear "Transcribing..." indicator
@@ -604,6 +618,9 @@ hs.hotkey.bind(mods, key,
             f:close()
             -- Remove internal newlines (whisper adds these during segmentation)
             text = text:gsub("\n", " "):gsub("^%s+", ""):gsub("%s+$", "")
+            -- Remove whisper hallucination tokens: [BLANK_AUDIO], [Music], [SOUND], etc.
+            text = text:gsub("%[%w+[%w_ ]*%]", "")
+            text = text:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
 
             if text and text ~= "" then
               -- Apply basic cleanup (always enabled)
@@ -633,9 +650,10 @@ hs.hotkey.bind(mods, key,
           hs.alert.show("Error: " .. tostring(exitCode))
         end
         os.remove(recordFile)
+        os.remove(trimmedFile)
         os.remove(outputFile)
       end,
-      {"-m", model, "-f", recordFile, "-otxt", "-of", outputBase, "-np"}
+      {"-m", model, "-f", useFile, "-otxt", "-of", outputBase, "-np", "-sns"}
     )
     whisperTask:start()
   end
