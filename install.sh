@@ -3,7 +3,7 @@
 # Usage: curl -fsSL URL -o /tmp/install.sh && bash /tmp/install.sh
 #    or: bash install.sh
 
-VERSION="1.4.9"  # Update this when making changes
+VERSION="1.5.0"  # Update this when making changes
 
 # Configuration constants
 readonly WHISPER_MODEL_DIR="$HOME/Library/Application Support/whisper.cpp"
