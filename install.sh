@@ -570,12 +570,12 @@ end
 
 hs.hotkey.bind(mods, key,
   function()
-    hs.alert.show("Recording...")
+    hs.alert.show("Recording...", 999)
     recordingTask = hs.task.new(sox, nil, {"-d", "-r", "16000", "-c", "1", recordFile})
     recordingTask:start()
   end,
   function()
-    -- Show persistent indicator (won't auto-dismiss)
+    hs.alert.closeAll()  -- Clear "Recording..." indicator
     hs.alert.show("Transcribing...", 999)
 
     if recordingTask then
