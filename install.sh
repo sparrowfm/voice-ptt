@@ -594,8 +594,9 @@ hs.hotkey.bind(mods, key,
       return
     end
 
-    -- Trim leading/trailing silence to speed up whisper and reduce hallucinations
-    hs.execute(sox .. " '" .. recordFile .. "' '" .. trimmedFile .. "' silence 1 0.1 1% reverse silence 1 0.1 1% reverse 2>/dev/null", true)
+    -- Trim trailing silence to speed up whisper and reduce hallucinations
+    -- Pad 0.2s silence at start so whisper doesn't drop the first word
+    hs.execute(sox .. " '" .. recordFile .. "' '" .. trimmedFile .. "' pad 0.2 0 reverse silence 1 0.1 1% reverse 2>/dev/null", true)
     -- Use trimmed file if it exists and has content, otherwise fall back to original
     local useFile = recordFile
     local trimCheck = io.open(trimmedFile, "r")
