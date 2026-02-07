@@ -25,8 +25,12 @@ One-command push-to-talk voice transcription for macOS using local Whisper AI.
 User presses hotkey
   → sox records audio to ~/rec_temp.wav
   → User releases hotkey
-  → whisper-cli transcribes (-otxt format)
-  → Lua strips internal newlines
+  → sox trims trailing silence → ~/rec_trimmed.wav
+  → whisper-cli transcribes with -sns flag (-otxt format)
+  → Lua strips newlines + hallucination tokens ([BLANK_AUDIO], etc.)
+  → Basic cleanup (filler words)
+  → Custom dictionary (find/replace)
+  → Advanced LLM cleanup (if enabled)
   → Text copied to clipboard
   → Auto-paste via Cmd+V
 ```
@@ -49,7 +53,7 @@ User presses hotkey
   ```
 
 ### Auto-Update Pattern
-- **Version tracking**: `VERSION="1.1.0"` at top of install.sh
+- **Version tracking**: `VERSION="1.5.0"` at top of install.sh
 - **Storage**: Version written to `~/.config/voice-ptt/version` during install
 - **Periodic check**: Hammerspoon timer runs every 7 days
 - **Check file**: `~/.config/voice-ptt/last-check` stores timestamp
@@ -109,6 +113,7 @@ Users can change via `voice-ptt-hotkey` command or manual edit.
 ```
 Whisper transcription
   ↓ Remove internal newlines
+  ↓ Strip hallucination tokens: [BLANK_AUDIO], [Music], [SOUND], etc.
   ↓ Basic cleanup (filler words)
   ↓ Custom dictionary (find/replace)
   ↓ Advanced LLM cleanup (if enabled, uses dictionary as context)
@@ -121,6 +126,16 @@ Whisper transcription
 - **Two-tier**: Basic (instant) + Advanced (LLM context)
 - **Management**: `voice-ptt-dictionary` command
 
+### Whisper Transcription Quality (v1.5.0)
+- **Trailing silence causes hallucinations**: Whisper generates [BLANK_AUDIO] spam on silent audio
+- **Fix**: sox trims trailing silence before whisper (`reverse silence 1 0.1 1% reverse`)
+- **Leading silence must NOT be trimmed**: Cuts off first word of speech
+- **Start padding**: 0.2s silence padded at start so whisper doesn't drop short initial words
+- **`-sns` flag**: Suppresses non-speech tokens at model level
+- **Hallucination regex**: `%[%w+[%w_ ]*%]` strips remaining bracketed tokens
+- **Base vs Medium model**: Medium (1.4GB) only marginally better than base (142MB) for accuracy; not worth the 3-5x speed penalty
+- **Persistent "dog"→"duck" errors**: Mic/audio quality issue, not model quality
+
 ## Gotchas
 
 - **Bash heredocs**: Use `<< 'EOF'` (quoted) to prevent shell variable expansion in Lua code
@@ -129,6 +144,9 @@ Whisper transcription
 - **Hammerspoon reload**: Use `open -g hammerspoon://reload` to reload without focusing
 - **Update script not embedded**: `update.sh` exists in repo but is recreated as `voice-ptt-update` during install
 - **Ollama wrapper vs app**: "could not find ollama app" = have wrapper, need `brew install --cask ollama`
+- **Regression tests restore backup**: `test-regression.sh` saves/restores `~/.hammerspoon/voice-ptt.lua` - live config changes get reverted after running tests
+- **Two files to update**: Always update both `~/.hammerspoon/voice-ptt.lua` (live) AND `install.sh` (template) - they diverge otherwise
+- **VAD mode crashes whisper-cli 1.8.3**: `--vad` without a Silero model file causes GGML_ASSERT failure - don't use it
 
 ## Repository
 
